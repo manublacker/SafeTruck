@@ -60,3 +60,14 @@ def astar(graph, origin, destination):
                 heapq.heappush(heap, (f, new_g, neighbor))  # Agrego el vecino a la cola
 
     return prev, g[destination]  # Devuelvo el camino y la distancia total al destino
+
+def route (prev, origin, destination):
+    route = []
+    route.append(destination)
+    new_prev = prev [destination]
+    while new_prev != origin: 
+        route.append(new_prev)
+        new_prev = prev [new_prev]
+    route.append(origin)
+    route.reverse()
+    return route
