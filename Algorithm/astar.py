@@ -61,13 +61,14 @@ def astar(graph, origin, destination):
 
     return prev, g[destination]  # Devuelvo el camino y la distancia total al destino
 
+#Funcion para reconstruir la ruta
 def route (prev, origin, destination):
-    route = []
-    route.append(destination)
-    new_prev = prev [destination]
-    while new_prev != origin: 
+    route = [] #Creo la lista de nodos
+    route.append(destination) 
+    new_prev = prev [destination] #Guardo el nodo previo al destino
+    while new_prev != origin: #Loop donde se guarda el nodo previo a donde estoy parado en la lista hasta llegar al origen
         route.append(new_prev)
         new_prev = prev [new_prev]
     route.append(origin)
-    route.reverse()
+    route.reverse() #Invierto la lista para que sea origen -> destino y no destino -> origen
     return route
