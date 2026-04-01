@@ -13,29 +13,18 @@
  *   penalizar peajes, calles de tierra, tráfico, etc.
  *******************************************************/
 
-/**
- * Identificador de nodo.
- * Lo dejamos como string para simplificar el manejo de claves.
- */
+//Identificador de nodo. Lo dejamos como string para simplificar el manejo de claves.
 type NodeId = string;
 
-/**
- * Nodo del grafo.
- * Representa un punto geográfico con latitud y longitud.
- */
+//Nodo del grafo. Representa un punto geográfico con latitud y longitud.
 interface GraphNode {
   id: NodeId;
   lat: number;
   lon: number;
 }
 
-/**
- * Arista del grafo.
- * Representa una conexión desde un nodo hacia otro.
- *
- * Además de la distancia, agregamos restricciones y propiedades
- * importantes para camiones.
- */
+//Arista del grafo. Representa una conexión desde un nodo hacia otro.
+// Además de la distancia, agregamos restricciones y propiedades importantes para camiones.
 interface GraphEdge {
   to: NodeId;                  // nodo destino de la arista
   lengthM: number;             // longitud en metros
@@ -56,25 +45,16 @@ interface GraphEdge {
   trafficPenalty?: number;
 }
 
-/**
- * Grafo vial.
- *
- * nodes:
- *   diccionario de nodos por id
- *
- * adjacency:
- *   lista de adyacencia:
- *   para cada nodo, un array con las aristas salientes
- */
+//Grafo vial.
+//nodes: diccionario de nodos por id
+//adjacency: 
+//lista de adyacencia: para cada nodo, un array con las aristas salientes
 interface Graph {
   nodes: Record<NodeId, GraphNode>;
   adjacency: Record<NodeId, GraphEdge[]>;
 }
 
-/**
- * Perfil del vehículo.
- * Define las características del camión.
- */
+//Perfil del vehículo. Define las características del camión.
 interface VehicleProfile {
   maxWeightKg: number;
   maxHeightM: number;
@@ -83,10 +63,7 @@ interface VehicleProfile {
   hazardousMaterial?: boolean;
 }
 
-/**
- * Opciones de ruteo.
- * Sirven para cambiar el comportamiento del costo.
- */
+//Opciones de ruteo. Sirven para cambiar el comportamiento del costo.
 interface RoutingOptions {
   avoidTolls?: boolean;        // evitar peajes
   preferHighways?: boolean;    // preferir autopistas
@@ -94,22 +71,17 @@ interface RoutingOptions {
   avoidGravel?: boolean;       // evitar ripio
 }
 
-/**
- * Resultado del algoritmo A*.
- */
+//Resultado del algoritmo A*.
 interface AStarResult {
   prev: Record<NodeId, NodeId | null>;
   distance: number;
   found: boolean;
 }
 
-/**
- * Estado dentro del heap.
- *
- * f = g + h
- * g = costo real acumulado desde origen
- * h = heurística estimada hasta destino
- */
+//Estado dentro del heap.
+//f = g + h
+//g = costo real acumulado desde origen
+//h = heurística estimada hasta destino
 interface HeapState {
   node: NodeId; //es un string que sirve como identificador como nodo
   f: number;
@@ -579,6 +551,7 @@ function reconstructRoute(prev: Record<NodeId, NodeId | null>, origin: NodeId, d
 //reconstruye la ruta
 //devuelve todo listo para usar
 
+//Esta función puede llegar a ser para mas adelante (la que esta comentada) que es la misma pero recibiendo un parámetro mas
 //function findTruckRoute(graph: Graph, origin: NodeId, destination: NodeId, vehicle: VehicleProfile, //options: RoutingOptions = {}
 function findTruckRoute(graph: Graph, origin: NodeId, destination: NodeId, vehicle: VehicleProfile): { path: NodeId[]; distance: number; found: boolean } {
     const result = astar(graph, origin, destination, vehicle);
