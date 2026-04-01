@@ -2,3 +2,12 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
+node_modules/
+cache/
+cache/
+
+# datasets pesados
+database/data/**/*.geojson
+database/base/**/*.geojson
+*.geojson
+database/graph.json
