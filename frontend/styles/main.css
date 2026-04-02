@@ -1,0 +1,281 @@
+:root {
+  /* Variables globales de diseño para reutilizar colores, sombras y tipografía. */
+  color-scheme: light;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --text: #172033;
+  --muted: #5f6b7f;
+  --primary: #1f7a4d;
+  --primary-dark: #16613b;
+  --line: #d8dee9;
+  --route: #2563eb;
+  --shadow: 0 20px 40px rgba(23, 32, 51, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell {
+  /* Contenedor base de la pantalla completa. */
+  position: relative;
+  min-height: 100vh;
+}
+
+.eyebrow,
+.status-pill,
+.result-label,
+.route-summary,
+#map-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.eyebrow,
+.status-pill,
+.result-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+h1,
+h2,
+h3,
+p,
+ul {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.45rem;
+}
+
+.status-pill {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #e5f7ec;
+  color: var(--primary-dark);
+}
+
+.map-shell {
+  /* Fija el mapa a toda la pantalla para que actúe como fondo interactivo. */
+  position: fixed;
+  inset: 0;
+}
+
+#route-map {
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+.search-panel {
+  /* Panel flotante estilo Google Maps: queda por encima del mapa gracias al z-index. */
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  z-index: 500;
+  width: min(420px, calc(100vw - 48px));
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(216, 222, 233, 0.9);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.brand-row,
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.route-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 13px 15px;
+  font: inherit;
+  color: var(--text);
+  background: #f8fafc;
+}
+
+.truck-details {
+  /* Caja plegable para esconder opciones avanzadas sin saturar la UI. */
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
+.truck-details summary {
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+button {
+  border: 0;
+  border-radius: 18px;
+  padding: 16px 20px;
+  background: var(--primary);
+  color: white;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+button:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.result-card {
+  margin-top: 24px;
+  padding: 22px;
+  border-radius: 22px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+}
+
+#route-title {
+  margin-top: 8px;
+}
+
+.route-summary {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.route-steps {
+  margin-top: 16px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.route-steps li {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.route-popup {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.route-sheet {
+  /* Hoja flotante inferior con resultado de ruta; en mobile se adapta como bottom sheet. */
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 500;
+  width: min(460px, calc(100vw - 48px));
+  padding: 18px 22px 22px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(216, 222, 233, 0.9);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.sheet-handle {
+  width: 52px;
+  height: 5px;
+  border-radius: 999px;
+  background: #d6dbe4;
+  margin: 0 auto 16px;
+}
+
+@media (max-width: 760px) {
+  /* Reglas responsive: en pantallas chicas los paneles ocupan casi todo el ancho. */
+  .search-panel {
+    top: 14px;
+    left: 14px;
+    width: calc(100vw - 28px);
+    padding: 18px;
+    border-radius: 24px;
+  }
+
+  .route-sheet {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    border-radius: 26px 26px 0 0;
+    max-height: 44vh;
+  }
+
+  .route-steps {
+    max-height: 18vh;
+  }
+}

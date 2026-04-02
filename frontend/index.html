@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SafeTruck | Planificador de rutas</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles/main.css" />
+  </head>
+  <body>
+    <!-- Pantalla principal: el mapa ocupa todo el fondo y los paneles flotan arriba. -->
+    <main class="app-shell">
+      <section class="map-shell">
+        <!-- Leaflet renderiza el mapa real de OpenStreetMap dentro de este div. -->
+        <div id="route-map" aria-label="Mapa de rutas SafeTruck"></div>
+      </section>
+
+      <!-- Panel superior: formulario de búsqueda de ruta y configuración del camión. -->
+      <section class="search-panel">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">SafeTruck</p>
+            <h1>Rutas para camiones</h1>
+          </div>
+          <p class="status-pill">Mock</p>
+        </div>
+
+        <form id="route-form" class="route-form">
+          <!-- Estos inputs hoy son texto libre; más adelante podrían conectarse a geocoding/autocomplete. -->
+          <label class="field">
+            <span>Origen</span>
+            <input id="origin-input" type="text" value="Depósito Villa Devoto" required />
+          </label>
+
+          <label class="field">
+            <span>Destino</span>
+            <input id="destination-input" type="text" value="Centro logístico Chacarita" required />
+          </label>
+
+          <!-- details/summary crea un bloque plegable nativo de HTML. -->
+          <details class="truck-details">
+            <summary>Perfil del camión y preferencias</summary>
+            <div class="grid-2">
+              <label class="field">
+                <span>Peso (kg)</span>
+                <input id="weight-input" type="number" value="12000" min="1" required />
+              </label>
+
+              <label class="field">
+                <span>Altura (m)</span>
+                <input id="height-input" type="number" value="4.1" min="0.1" step="0.1" required />
+              </label>
+
+              <label class="field">
+                <span>Ancho (m)</span>
+                <input id="width-input" type="number" value="2.5" min="0.1" step="0.1" required />
+              </label>
+
+              <label class="field">
+                <span>Largo (m)</span>
+                <input id="length-input" type="number" value="12" min="0.1" step="0.1" required />
+              </label>
+            </div>
+
+            <div class="options">
+              <label class="toggle">
+                <input id="avoid-tolls-input" type="checkbox" checked />
+                <span>Evitar peajes</span>
+              </label>
+
+              <label class="toggle">
+                <input id="prefer-highways-input" type="checkbox" checked />
+                <span>Preferir corredores</span>
+              </label>
+            </div>
+          </details>
+
+          <button id="submit-button" type="submit">Buscar ruta</button>
+        </form>
+      </section>
+
+      <!-- Panel inferior: muestra resumen textual y lista de puntos de la ruta devuelta por la API/mock. -->
+      <article class="route-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div>
+            <p class="result-label">Ruta sugerida</p>
+            <h2 id="route-title">Esperando búsqueda</h2>
+          </div>
+          <p id="map-status" class="status-pill">Sin ruta</p>
+        </div>
+        <p id="route-summary" class="route-summary">
+          Completá origen, destino y buscá una ruta para ver el recorrido.
+        </p>
+        <ul id="route-steps" class="route-steps"></ul>
+      </article>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script type="module" src="./scripts/app.js"></script>
+  </body>
+</html>
