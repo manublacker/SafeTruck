@@ -2,7 +2,7 @@ import { fetchMockTruckRoute } from "./mockRouteService.js";
 
 const API_BASE_URL = "http://localhost:3000";
 // Mientras no exista backend real, dejamos activado el servicio simulado.
-const USE_MOCK_API = true;
+const USE_MOCK_API = false;
 
 // Esta función es la puerta de salida del frontend hacia la API de rutas.
 export async function requestTruckRoute(payload) {

@@ -54,6 +54,9 @@ function buildRouteRequestPayload() {
   return {
     originLabel: document.querySelector("#origin-input").value.trim(),
     destinationLabel: document.querySelector("#destination-input").value.trim(),
+    // Coordenadas fijas de prueba hasta que haya geocodificación real
+    origin: { lat: -34.6037, lon: -58.3816 },
+    destination: { lat: -34.5875, lon: -58.4370 },
     vehicle: {
       maxWeightKg: Number(document.querySelector("#weight-input").value),
       maxHeightM: Number(document.querySelector("#height-input").value),
