@@ -12,7 +12,4 @@
 UPDATE aristas a
 SET camion_permitido = TRUE
 FROM red_camiones r
-WHERE ST_Intersects(
-    ST_Buffer(r.geom::geography, 15)::geometry,
-    a.geom
-);
+WHERE ST_DWithin(a.geom::geography, r.geom::geography, 15)

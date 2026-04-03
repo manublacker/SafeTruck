@@ -72,10 +72,10 @@ LANGUAGE sql STABLE AS $$
         ST_X(n.geom)                        AS lon,
         ST_Distance(
             n.geom::geography,
-            ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography
+            ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography  
         )                                   AS distancia_m
     FROM nodos n
-    ORDER BY n.geom <-> ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)
+    ORDER BY n.geom <-> ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326) -- ordena por cercania usando índice espacial
     LIMIT 1;
 $$;
 
