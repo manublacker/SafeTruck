@@ -17,13 +17,13 @@ INSERT INTO aristas (red_vial_id, costo, costo_reverso, camion_permitido, sentid
 SELECT
     id,
     CASE
-        WHEN UPPER(sentido) = 'DECRECIENTE' THEN -1
-        ELSE longitud_m
-    END AS costo,
-    CASE
-        WHEN UPPER(sentido) = 'CRECIENTE' THEN -1
-        ELSE longitud_m
-    END AS costo_reverso,
+    WHEN UPPER(sentido) = 'DECRECIENTE' THEN -1
+    ELSE COALESCE(longitud_m, ST_Length(geom::geography))
+END AS costo,
+CASE
+    WHEN UPPER(sentido) = 'CRECIENTE' THEN -1
+    ELSE COALESCE(longitud_m, ST_Length(geom::geography))
+END AS costo_reverso,
     FALSE,
     sentido,
     geom
