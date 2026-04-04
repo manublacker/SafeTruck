@@ -16,7 +16,7 @@
  *******************************************************/
 
 import { Router, Request, Response } from "express";
-import { findTruckRoute } from "../../../Algorithm/astar";
+import { findTruckRoute } from "../algorithm/astar";
 import pool from "../db";
 
 const router = Router();
