@@ -187,9 +187,9 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 //Verifica si una arista puede ser recorrida por el camión. Si alguna restricción se viola, devuelve false.
 function isEdgeAllowed(edge: GraphEdge, vehicle: VehicleProfile): boolean {
   // Si explícitamente la calle no permite camiones
- // if (edge.truckAllowed === false) {
-  //  return false;
- // }
+  if (edge.truckAllowed === false) {
+    return false;
+  }
 
   // Restricción de peso
   if (edge.maxWeightKg !== undefined && vehicle.maxWeightKg > edge.maxWeightKg) {
@@ -553,9 +553,13 @@ function reconstructRoute(prev: Record<NodeId, NodeId | null>, origin: NodeId, d
 
 //Esta función puede llegar a ser para mas adelante (la que esta comentada) que es la misma pero recibiendo un parámetro mas
 //function findTruckRoute(graph: Graph, origin: NodeId, destination: NodeId, vehicle: VehicleProfile, //options: RoutingOptions = {}
-export function findTruckRoute(graph: Graph, origin: NodeId, destination: NodeId, vehicle: VehicleProfile): { path: NodeId[]; distance: number; found: boolean } {
+export function findTruckRoute(
+  graph: Graph,
+  origin: NodeId,
+  destination: NodeId,
+  vehicle: VehicleProfile
+): { path: NodeId[]; distance: number; found: boolean } {
     const result = astar(graph, origin, destination, vehicle);
-    //const result = astar(graph, origin, destination, vehicle, options);
     if (!result.found) {
         return {
         path: [],
