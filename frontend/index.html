@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SafeTruck | Planificador de rutas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -18,6 +24,11 @@
       <section class="map-shell">
         <!-- Leaflet renderiza el mapa real de OpenStreetMap dentro de este div. -->
         <div id="route-map" aria-label="Mapa de rutas SafeTruck"></div>
+        <div class="map-overlay"></div>
+        <div class="map-legend">
+          <span class="legend-dot legend-route"></span>
+          <span>Ruta sugerida</span>
+        </div>
       </section>
 
       <!-- Panel superior: formulario de búsqueda de ruta y configuración del camión. -->
@@ -26,6 +37,10 @@
           <div>
             <p class="eyebrow">SafeTruck</p>
             <h1>Rutas para camiones</h1>
+            <p class="hero-copy">
+              Planeá trayectos urbanos con foco en tránsito pesado y validación sobre la red vial
+              cargada en tiempo real.
+            </p>
           </div>
           <p class="status-pill">API real</p>
         </div>
@@ -116,6 +131,11 @@
         <p id="route-summary" class="route-summary">
           Completá origen, destino y buscá una ruta para ver el recorrido.
         </p>
+        <div class="route-actions">
+          <button id="focus-start-button" class="secondary-button" type="button" disabled>
+            Iniciar trayecto
+          </button>
+        </div>
         <ul id="route-steps" class="route-steps"></ul>
       </article>
     </main>

@@ -1,6 +1,6 @@
 import { requestTruckRoute } from "./services/routeApiClient.js";
 import { geocodeLocation, searchLocations } from "./services/geocodingService.js";
-import { initializeRouteMap, renderRouteMap, renderEmptyMap } from "./ui/mapRenderer.js";
+import { focusRouteStart, initializeRouteMap, renderRouteMap, renderEmptyMap } from "./ui/mapRenderer.js";
 import { renderRouteSummary, setLoadingState } from "./ui/routePanel.js";
 
 // Referencias a elementos del DOM para poder leer inputs y cambiar estados visuales.
@@ -13,6 +13,7 @@ const originStatus = document.querySelector("#origin-status");
 const destinationStatus = document.querySelector("#destination-status");
 const originSuggestions = document.querySelector("#origin-suggestions");
 const destinationSuggestions = document.querySelector("#destination-suggestions");
+const focusStartButton = document.querySelector("#focus-start-button");
 
 const locationFields = {
   origin: {
@@ -36,6 +37,9 @@ initializeRouteMap();
 renderEmptyMap();
 initializeGeocodingField("origin");
 initializeGeocodingField("destination");
+focusStartButton?.addEventListener("click", () => {
+  focusRouteStart();
+});
 
 // Este listener intercepta el submit del formulario y dispara la búsqueda de ruta.
 form.addEventListener("submit", async (event) => {
@@ -55,6 +59,9 @@ form.addEventListener("submit", async (event) => {
     // Se actualiza el panel textual y el mapa con la respuesta recibida.
     renderRouteSummary(routeResponse);
     renderRouteMap(routeResponse);
+    if (focusStartButton) {
+      focusStartButton.disabled = !routeResponse.found;
+    }
 
     mapStatus.textContent = routeResponse.found
       ? "Ruta encontrada"
@@ -70,6 +77,9 @@ form.addEventListener("submit", async (event) => {
     });
 
     renderEmptyMap();
+    if (focusStartButton) {
+      focusStartButton.disabled = true;
+    }
     mapStatus.textContent = "Error al renderizar la ruta";
   } finally {
     setLoadingState(submitButton, false);

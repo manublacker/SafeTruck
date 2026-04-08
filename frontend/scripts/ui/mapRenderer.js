@@ -6,8 +6,8 @@ let map = null;
 let routeLayer = null;
 let originMarker = null;
 let destinationMarker = null;
+let currentRoute = null;
 
-const truckIcon = createMarkerIcon("#16a34a");
 const destinationIcon = createMarkerIcon("#dc2626");
 
 export function initializeRouteMap() {
@@ -40,6 +40,7 @@ export function renderEmptyMap() {
 
   // Limpia cualquier ruta previa y vuelve al encuadre inicial.
   clearCurrentRoute();
+  currentRoute = null;
   map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 }
 
@@ -59,6 +60,8 @@ export function renderRouteMap(routeResponse) {
   const latLngs = routeResponse.path.map((point) => [point.lat, point.lon]);
   const originPoint = routeResponse.path[0];
   const destinationPoint = routeResponse.path[routeResponse.path.length - 1];
+  currentRoute = routeResponse;
+  const routeHeading = getRouteHeading(routeResponse.path);
 
   // Dibuja la ruta como una línea azul sobre el mapa.
   routeLayer = window.L.polyline(latLngs, {
@@ -70,11 +73,13 @@ export function renderRouteMap(routeResponse) {
 
   // Marcador de origen.
   originMarker = window.L.marker([originPoint.lat, originPoint.lon], {
-    icon: truckIcon,
+    icon: createRouteStartIcon(routeHeading),
     title: originPoint.label,
   })
     .addTo(map)
-    .bindPopup(`<strong>Origen</strong><br><span class="route-popup">${originPoint.label}</span>`);
+    .bindPopup(
+      `<strong>Inicio del trayecto</strong><br><span class="route-popup">${originPoint.label}</span>`
+    );
 
   // Marcador de destino.
   destinationMarker = window.L.marker([destinationPoint.lat, destinationPoint.lon], {
@@ -93,6 +98,22 @@ export function renderRouteMap(routeResponse) {
   });
 }
 
+export function focusRouteStart() {
+  if (!map || !currentRoute?.found || !currentRoute.path?.length) {
+    return;
+  }
+
+  const originPoint = currentRoute.path[0];
+  map.setView([originPoint.lat, originPoint.lon], 17.5, {
+    animate: true,
+    duration: 0.8,
+  });
+
+  if (originMarker) {
+    originMarker.openPopup();
+  }
+}
+
 function clearCurrentRoute() {
   // Si ya había una polyline o marcadores dibujados, se eliminan antes de renderizar la nueva ruta.
   if (routeLayer) {
@@ -109,6 +130,82 @@ function clearCurrentRoute() {
     destinationMarker.remove();
     destinationMarker = null;
   }
+}
+
+function getRouteHeading(path) {
+  if (!Array.isArray(path) || path.length < 2) {
+    return 0;
+  }
+
+  const start = path[0];
+  const next = path[1];
+  const deltaX = next.lon - start.lon;
+  const deltaY = next.lat - start.lat;
+
+  return (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
+}
+
+function createRouteStartIcon(angle) {
+  return window.L.divIcon({
+    className: "",
+    html: `
+      <div style="
+        position: relative;
+        width: 74px;
+        height: 74px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <div style="
+          position: absolute;
+          width: 74px;
+          height: 74px;
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(31, 102, 73, 0.22) 0%, rgba(31, 102, 73, 0) 68%);
+        "></div>
+        <div style="
+          position: absolute;
+          width: 56px;
+          height: 56px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.92);
+          border: 2px solid rgba(31, 102, 73, 0.14);
+          box-shadow: 0 14px 26px rgba(18, 34, 28, 0.18);
+        "></div>
+        <div style="
+          position: absolute;
+          position: relative;
+          z-index: 2;
+          width: 50px;
+          height: 50px;
+          transform: rotate(${angle}deg);
+          border-radius: 18px;
+          background: linear-gradient(135deg, #1f6649 0%, #2f8b67 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 24px;
+          box-shadow: 0 14px 26px rgba(18, 34, 28, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+        ">
+          <div style="
+            position: absolute;
+            right: -10px;
+            width: 0;
+            height: 0;
+            border-top: 11px solid transparent;
+            border-bottom: 11px solid transparent;
+            border-left: 17px solid #1f6649;
+            filter: drop-shadow(0 6px 12px rgba(18, 34, 28, 0.18));
+          "></div>
+          <div style="transform: rotate(${-angle}deg); line-height: 1;">🚚</div>
+        </div>
+      </div>
+    `,
+    iconSize: [74, 74],
+    iconAnchor: [37, 37],
+  });
 }
 
 function createMarkerIcon(color) {
