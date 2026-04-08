@@ -27,20 +27,39 @@
             <p class="eyebrow">SafeTruck</p>
             <h1>Rutas para camiones</h1>
           </div>
-          <p class="status-pill">Mock</p>
+          <p class="status-pill">API real</p>
         </div>
 
         <form id="route-form" class="route-form">
-          <!-- Estos inputs hoy son texto libre; más adelante podrían conectarse a geocoding/autocomplete. -->
-          <label class="field">
-            <span>Origen</span>
-            <input id="origin-input" type="text" value="Depósito Villa Devoto" required />
-          </label>
+          <div class="location-field">
+            <label class="field">
+              <span>Origen</span>
+              <input
+                id="origin-input"
+                type="text"
+                value="Villa Devoto, Buenos Aires"
+                autocomplete="off"
+                required
+              />
+            </label>
+            <p id="origin-status" class="field-status">Escribí una dirección o lugar y elegí una sugerencia.</p>
+            <ul id="origin-suggestions" class="suggestions-list" hidden></ul>
+          </div>
 
-          <label class="field">
-            <span>Destino</span>
-            <input id="destination-input" type="text" value="Centro logístico Chacarita" required />
-          </label>
+          <div class="location-field">
+            <label class="field">
+              <span>Destino</span>
+              <input
+                id="destination-input"
+                type="text"
+                value="Chacarita, Buenos Aires"
+                autocomplete="off"
+                required
+              />
+            </label>
+            <p id="destination-status" class="field-status">Vamos a usar coordenadas reales del lugar seleccionado.</p>
+            <ul id="destination-suggestions" class="suggestions-list" hidden></ul>
+          </div>
 
           <!-- details/summary crea un bloque plegable nativo de HTML. -->
           <details class="truck-details">

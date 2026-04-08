@@ -31,7 +31,7 @@ const DB_CONFIG = {
 // ---------------------------------------------------------------------------
 // Rutas a los archivos de datos
 // ---------------------------------------------------------------------------
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = path.join(process.cwd(), "database", "data");
 
 const ARCHIVOS = {
   redVialCABA: path.join(DATA_DIR, "base", "red-vial-CABA.geojson"),
