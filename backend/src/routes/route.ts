@@ -111,6 +111,22 @@ router.post("/", async (req: Request, res: Response) => {
       lon: grafo.nodes[nodeId].lon,
       label: "",
     }));
+  // Calculo la distancia real recorriendo las aristas del path
+  // sin contar las penalizaciones artificiales del A*
+  let distanciaRealM = 0;
+  for (let i = 0; i < resultado.path.length - 1; i++) {
+    const desde = resultado.path[i];
+    const hasta = resultado.path[i + 1];
+    const resArista = await pool.query(
+      `SELECT costo FROM aristas 
+      WHERE source = $1::integer AND target = $2::integer 
+      ORDER BY costo ASC LIMIT 1`,
+      [desde, hasta]
+    );
+    if (resArista.rows.length > 0) {
+      distanciaRealM += resArista.rows[0].costo;
+    }
+  }
 
     // Estimo la duración asumiendo 30 km/h de velocidad promedio en ciudad
     // Es una aproximación simple válida para el MVP
@@ -123,8 +139,8 @@ router.post("/", async (req: Request, res: Response) => {
       routeId: `route-${Date.now()}`,
       originLabel: originLabel ?? "",
       destinationLabel: destinationLabel ?? "",
-      distanceM: Math.round(resultado.distance),
-      estimatedDurationMin,
+      distanceM: Math.round(distanciaRealM),
+      estimatedDurationMin: Math.round(distanciaRealM / velocidadMs / 60),
       routeSummary: "Ruta calculada correctamente.",
       path,
       warnings: [],
