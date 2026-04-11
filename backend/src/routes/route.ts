@@ -75,7 +75,7 @@ router.post("/", async (req: Request, res: Response) => {
     const nodoDestino = resDestino.rows[0];
 
     // Cargo solo la subred habilitada para camiones para evitar rutas por calles no permitidas
-    const resGrafo = await pool.query("SELECT export_graph_json(TRUE)");
+    const resGrafo = await pool.query("SELECT export_graph_json(FALSE)");
     const grafo = resGrafo.rows[0]["export_graph_json"];
 
     // Ejecuto A* entre el nodo origen y el nodo destino con el perfil del camión

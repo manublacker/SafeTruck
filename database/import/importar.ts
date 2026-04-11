@@ -2,9 +2,9 @@
  * importar.ts
  *
  * Script de importación de datos geoespaciales a PostgreSQL/PostGIS.
- * Carga tres fuentes en las tablas red_vial y red_camiones.
+ * Carga las fuentes en las tablas red_vial y red_camiones.
  *
- * Uso: npx ts-node importar.ts
+ * Uso: npx ts-node database/import/importar.ts
  *
  * Orden de ejecución esperado:
  *   1. importar.ts        ← este script
@@ -16,6 +16,9 @@
 import fs from "fs";
 import path from "path";
 import { Client } from "pg";
+
+// Resuelvo la ruta a database/data desde la raíz del proyecto
+const DATA_DIR = path.resolve("database/data");
 
 // ---------------------------------------------------------------------------
 // Configuración de conexión a la base de datos
@@ -41,6 +44,7 @@ const ARCHIVOS = {
     "restricciones",
     "CABA - Red de Tránsito Pesado.json"
   ),
+  redVialLanus: path.join(DATA_DIR, "base", "red-vial-lanus.geojson"),
 };
 
 // ---------------------------------------------------------------------------
@@ -85,9 +89,7 @@ function geometriaALineStrings(
   geom: LineStringGeometry | MultiLineStringGeometry
 ): string[] {
   if (geom.type === "LineString") {
-    const coords = geom.coordinates
-      .map((c) => `${c[0]} ${c[1]}`)
-      .join(", ");
+    const coords = geom.coordinates.map((c) => `${c[0]} ${c[1]}`).join(", ");
     return [`LINESTRING(${coords})`];
   }
 
@@ -117,7 +119,7 @@ function toTextOrNull(val: unknown): string | null {
 // Importación: red-vial-CABA.geojson → red_vial
 // ---------------------------------------------------------------------------
 async function importarRedVialCABA(client: Client): Promise<void> {
-  console.log("\n[1/3] Importando red vial de CABA...");
+  console.log("\n[1/4] Importando red vial de CABA...");
 
   const geojson = leerGeoJSON(ARCHIVOS.redVialCABA);
   let insertados = 0;
@@ -126,7 +128,6 @@ async function importarRedVialCABA(client: Client): Promise<void> {
   for (const feature of geojson.features) {
     const p = feature.properties;
 
-    // Campos obligatorios
     const featureId = toTextOrNull(p["id"]);
     const nombre = toTextOrNull(p["nomoficial"]);
 
@@ -152,23 +153,23 @@ async function importarRedVialCABA(client: Client): Promise<void> {
         ON CONFLICT (dataset_origen, feature_id) DO NOTHING
         `,
         [
-          "caba",                                   // dataset_origen
-          featureId,                                // feature_id
-          toTextOrNull(p["codigo"]),                // codigo
-          nombre,                                   // nombre
-          toTextOrNull(p["nom_mapa"]),              // nombre_alterno
-          toTextOrNull(p["tipo_c"]),                // tipo_via
-          typeof p["long"] === "number" ? p["long"] : null, // longitud_m
-          normalizarSentido(p["sentido"]),          // sentido
-          toTextOrNull(p["red_jerarq"]),            // jerarquia_vial
-          "CABA",                                   // jurisdiccion
-          JSON.stringify({                          // metadata
+          "caba",
+          featureId,
+          toTextOrNull(p["codigo"]),
+          nombre,
+          toTextOrNull(p["nom_mapa"]),
+          toTextOrNull(p["tipo_c"]),
+          typeof p["long"] === "number" ? p["long"] : null,
+          normalizarSentido(p["sentido"]),
+          toTextOrNull(p["red_jerarq"]),
+          "CABA",
+          JSON.stringify({
             barrio: p["barrio"],
             comuna: p["comuna"],
             bicisenda: p["bicisenda"],
             observa: p["observa"],
           }),
-          wkt,                                      // geom
+          wkt,
         ]
       );
       insertados++;
@@ -182,7 +183,7 @@ async function importarRedVialCABA(client: Client): Promise<void> {
 // Importación: rutas-nacionales.geojson → red_vial
 // ---------------------------------------------------------------------------
 async function importarRutasNacionales(client: Client): Promise<void> {
-  console.log("\n[2/3] Importando rutas nacionales...");
+  console.log("\n[2/4] Importando rutas nacionales...");
 
   const geojson = leerGeoJSON(ARCHIVOS.rutasNacionales);
   let insertados = 0;
@@ -191,7 +192,6 @@ async function importarRutasNacionales(client: Client): Promise<void> {
   for (const feature of geojson.features) {
     const p = feature.properties;
 
-    // El ID único de cada feature viene en feature.id (ej: "Rutas_Nacionales.fid-...")
     const featureId = toTextOrNull(feature.id ?? p["fid"] ?? p["id"]);
     const nombre =
       toTextOrNull(p["nombre"] ?? p["name"] ?? p["ruta"] ?? p["NAME"]) ??
@@ -204,7 +204,6 @@ async function importarRutasNacionales(client: Client): Promise<void> {
 
     const wktList = geometriaALineStrings(feature.geometry);
 
-    // Las rutas nacionales no tienen sentido explícito → doble mano por defecto
     for (const wkt of wktList) {
       await client.query(
         `
@@ -218,15 +217,15 @@ async function importarRutasNacionales(client: Client): Promise<void> {
         ON CONFLICT (dataset_origen, feature_id) DO NOTHING
         `,
         [
-          "rn",                         // dataset_origen
-          featureId,                    // feature_id
-          nombre,                       // nombre
-          "RUTA",                       // tipo_via
-          "DOBLE MANO",                 // sentido (default para rutas nacionales)
-          "TRONCAL",                    // jerarquia_vial
-          "Nacional",                   // jurisdiccion
-          JSON.stringify(p),            // metadata: guardamos todo lo original
-          wkt,                          // geom
+          "rn",
+          featureId,
+          nombre,
+          "RUTA",
+          "DOBLE MANO",
+          "TRONCAL",
+          "Nacional",
+          JSON.stringify(p),
+          wkt,
         ]
       );
       insertados++;
@@ -240,7 +239,7 @@ async function importarRutasNacionales(client: Client): Promise<void> {
 // Importación: CABA - Red de Tránsito Pesado.json → red_camiones
 // ---------------------------------------------------------------------------
 async function importarRedCamiones(client: Client): Promise<void> {
-  console.log("\n[3/3] Importando red de tránsito pesado de CABA...");
+  console.log("\n[3/4] Importando red de tránsito pesado de CABA...");
 
   const geojson = leerGeoJSON(ARCHIVOS.redCamiones);
   let insertados = 0;
@@ -254,16 +253,13 @@ async function importarRedCamiones(client: Client): Promise<void> {
       continue;
     }
 
-    // El nombre viene en "name", la descripción en "description"
     const nombre = toTextOrNull(p["name"]) ?? "SIN NOMBRE";
     const descripcion = toTextOrNull(p["description"]);
 
-    // Extraemos desde/hasta de la descripción si tiene formato "e/ X y Y" o "entre X y Y"
     let desdeCalle: string | null = null;
     let hastaCalle: string | null = null;
 
     if (descripcion) {
-      // Intenta parsear "entre X y Y" o "e/ X y Y"
       const match = descripcion.match(/(?:entre|e\/)\s+(.+?)\s+y\s+(.+)/i);
       if (match) {
         desdeCalle = match[1].trim();
@@ -284,16 +280,96 @@ async function importarRedCamiones(client: Client): Promise<void> {
         )
         `,
         [
-          "caba",       // dataset_origen
-          nombre,       // nombre
-          desdeCalle,   // desde_calle
-          hastaCalle,   // hasta_calle
-          descripcion,  // descripcion
+          "caba",
+          nombre,
+          desdeCalle,
+          hastaCalle,
+          descripcion,
           JSON.stringify({
             stroke: p["stroke"],
             styleUrl: p["styleUrl"],
-          }),           // metadata
-          wkt,          // geom
+          }),
+          wkt,
+        ]
+      );
+      insertados++;
+    }
+  }
+
+  console.log(`  ✓ ${insertados} filas insertadas, ${omitidos} omitidas.`);
+}
+
+// ---------------------------------------------------------------------------
+// Importación genérica: cualquier GeoJSON descargado con OSMnx → red_vial
+// Sirve para Lanús y cualquier municipio que agreguemos después.
+// Parámetros:
+//   - rutaArchivo: path al GeoJSON
+//   - dataset: identificador único del municipio (ej: "lanus", "avellaneda")
+//   - jurisdiccion: provincia a la que pertenece (ej: "Buenos Aires")
+// ---------------------------------------------------------------------------
+async function importarRedVialOSMnx(
+  client: Client,
+  rutaArchivo: string,
+  dataset: string,
+  jurisdiccion: string
+): Promise<void> {
+  console.log(`\n[4/4] Importando red vial OSMnx: ${dataset}...`);
+
+  const geojson = leerGeoJSON(rutaArchivo);
+  let insertados = 0;
+  let omitidos = 0;
+
+  for (const feature of geojson.features) {
+    const p = feature.properties;
+
+    // Combino osmid + u + v como ID único para evitar conflictos entre tramos de la misma calle
+    const featureId = `${p["osmid"]}_${p["u"]}_${p["v"]}`;
+    const nombre = toTextOrNull(p["name"]);
+
+    if (!nombre || !feature.geometry) {
+      omitidos++;
+      continue;
+    }
+
+    // OSMnx marca oneway como booleano o string "True"/"False"
+    const sentido =
+      p["oneway"] === true || p["oneway"] === "True"
+        ? "CRECIENTE"
+        : "DOBLE MANO";
+
+    const wktList = geometriaALineStrings(feature.geometry);
+
+    for (const wkt of wktList) {
+      await client.query(
+        `
+        INSERT INTO red_vial (
+          dataset_origen, feature_id, nombre,
+          tipo_via, longitud_m, sentido,
+          jerarquia_vial, jurisdiccion, metadata, geom
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9,
+          ST_GeomFromText($10, 4326)
+        )
+        ON CONFLICT (dataset_origen, feature_id) DO NOTHING
+        `,
+        [
+          dataset,
+          featureId,
+          nombre,
+          toTextOrNull(p["highway"]),
+          typeof p["length"] === "number" ? p["length"] : null,
+          sentido,
+          toTextOrNull(p["highway"]),
+          jurisdiccion,
+          JSON.stringify({
+            osmid: p["osmid"],
+            lanes: p["lanes"],
+            maxspeed: p["maxspeed"],
+            ref: p["ref"],
+            bridge: p["bridge"],
+            junction: p["junction"],
+          }),
+          wkt,
         ]
       );
       insertados++;
@@ -313,10 +389,15 @@ async function main(): Promise<void> {
     await client.connect();
     console.log("Conectado a PostgreSQL.");
 
-    // Ejecuta las tres importaciones en orden
     await importarRedVialCABA(client);
     await importarRutasNacionales(client);
     await importarRedCamiones(client);
+    await importarRedVialOSMnx(
+      client,
+      ARCHIVOS.redVialLanus,
+      "lanus",
+      "Buenos Aires"
+    );
 
     console.log("\n✅ Importación completa.");
     console.log(

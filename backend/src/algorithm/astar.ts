@@ -186,69 +186,40 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 
 //Verifica si una arista puede ser recorrida por el camión. Si alguna restricción se viola, devuelve false.
 function isEdgeAllowed(edge: GraphEdge, vehicle: VehicleProfile): boolean {
-  // Si explícitamente la calle no permite camiones
-  if (edge.truckAllowed === false) {
-    return false;
+    // Restricciones físicas siguen siendo prohibiciones absolutas
+    if (edge.maxWeightKg !== undefined && vehicle.maxWeightKg > edge.maxWeightKg) {
+      return false;
+    }
+    if (edge.maxHeightM !== undefined && vehicle.maxHeightM > edge.maxHeightM) {
+      return false;
+    }
+    if (edge.maxWidthM !== undefined && vehicle.maxWidthM > edge.maxWidthM) {
+      return false;
+    }
+    if (edge.maxLengthM !== undefined && vehicle.maxLengthM > edge.maxLengthM) {
+      return false;
+    }
+    // truckAllowed ya no bloquea — se penaliza en el costo
+    return true;
   }
-
-  // Restricción de peso
-  if (edge.maxWeightKg !== undefined && vehicle.maxWeightKg > edge.maxWeightKg) {
-    return false;
-  }
-
-  // Restricción de altura
-  if (edge.maxHeightM !== undefined && vehicle.maxHeightM > edge.maxHeightM) {
-    return false;
-  }
-
-  // Restricción de ancho
-  if (edge.maxWidthM !== undefined && vehicle.maxWidthM > edge.maxWidthM) {
-    return false;
-  }
-
-  // Restricción de largo
-  if (edge.maxLengthM !== undefined && vehicle.maxLengthM > edge.maxLengthM) {
-    return false;
-  }
-
-  return true;
-}
-
-//Función opcional para usar mas adelante, podemos cambiar los valores
-//Calcula el costo de recorrer una arista. Importante: No usamos solamente la distancia. 
-//Aplicamos penalizaciones o preferencias según el tipo de vía. Esto permite que la mejor ruta no sea siempre la más corta, sino la más adecuada para un camión.
-function edgeCost(edge: GraphEdge, options: RoutingOptions = {}): number {
+  
+  function edgeCost(edge: GraphEdge, options: RoutingOptions = {}): number {
     let cost = edge.lengthM;
-
-    // Penalización por peaje
-    if (options.avoidTolls && edge.toll) {
-        cost += 2000;
+  
+    // Si la calle no está habilitada para camiones, penalizo fuerte
+    // El camión la puede usar solo si no hay otra opción
+    if (edge.truckAllowed === false) {
+      cost += 10000;
     }
-
-    // Penalización por tierra
-    if (options.avoidDirt && edge.surface === "dirt") {
-        cost += 5000;
-    }
-
-    // Penalización por ripio
-    if (options.avoidGravel && edge.surface === "gravel") {
-        cost += 1500;
-    }
-
-    // Preferencia por autopistas/corredores
-    if (options.preferHighways && edge.highway) {
-        cost -= 300;
-    }
-
-    // Penalización dinámica por tráfico
-    if (edge.trafficPenalty !== undefined) {
-        cost += edge.trafficPenalty;
-    }
-
-    // Evitamos costos negativos o cero
+  
+    if (options.avoidTolls && edge.toll) cost += 2000;
+    if (options.avoidDirt && edge.surface === "dirt") cost += 5000;
+    if (options.avoidGravel && edge.surface === "gravel") cost += 1500;
+    if (options.preferHighways && edge.highway) cost -= 300;
+    if (edge.trafficPenalty !== undefined) cost += edge.trafficPenalty;
+  
     return Math.max(cost, 1);
-}
-
+  }
 //Valida que el origen y destino existan dentro del grafo.
 function validateGraphInput(graph: Graph, origin: NodeId, destination: NodeId): void {
     if (!graph || !graph.nodes || !graph.adjacency) {
@@ -363,7 +334,7 @@ export function astar(graph: Graph, origin: NodeId, destination: NodeId, vehicle
                 continue;
             }
 
-            const tentativeG = gScore[currentNode] + edge.lengthM; //calcula la nueva distancia acumulada usando la longitud de la arista
+            const tentativeG = gScore[currentNode] + edgeCost(edge); //calcula la nueva distancia acumulada usando la longitud de la arista
 
             //si encontró un camino más corto hacia el vecino, actualiza los datos
             if (tentativeG < gScore[neighbor]) {
