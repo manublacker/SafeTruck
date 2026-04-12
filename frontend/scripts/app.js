@@ -1,6 +1,6 @@
 import { requestTruckRoute } from "./services/routeApiClient.js";
 import { geocodeLocation, searchLocations } from "./services/geocodingService.js";
-import { focusRouteStart, initializeRouteMap, renderRouteMap, renderEmptyMap } from "./ui/mapRenderer.js";
+import { focusRouteStart, initializeRouteMap, renderRouteMap, renderEmptyMap, startLocationTracking } from "./ui/mapRenderer.js";
 import { renderRouteSummary, setLoadingState } from "./ui/routePanel.js";
 
 // Referencias a elementos del DOM para poder leer inputs y cambiar estados visuales.
@@ -41,6 +41,16 @@ focusStartButton?.addEventListener("click", () => {
   focusRouteStart();
 });
 
+// Inicio el tracking de ubicación
+startLocationTracking(({ lat, lon }) => {
+  // Solo actualizo el input si el usuario no escribió nada todavía
+  if (!locationFields.origin.selectedLocation) {
+    locationFields.origin.selectedLocation = { lat, lon, label: "Mi ubicación" };
+    originInput.value = "Mi ubicación";
+    setFieldStatus(locationFields.origin, `Ubicación actual: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+  }
+});
+
 // Este listener intercepta el submit del formulario y dispara la búsqueda de ruta.
 form.addEventListener("submit", async (event) => {
   // Evita que el navegador recargue la página al enviar el formulario.
@@ -59,6 +69,7 @@ form.addEventListener("submit", async (event) => {
     // Se actualiza el panel textual y el mapa con la respuesta recibida.
     renderRouteSummary(routeResponse);
     renderRouteMap(routeResponse);
+    document.querySelector(".route-sheet").classList.add("visible");
     if (focusStartButton) {
       focusStartButton.disabled = !routeResponse.found;
     }

@@ -226,3 +226,49 @@ function createMarkerIcon(color) {
     iconAnchor: [10, 10],
   });
 }
+
+let userLocationMarker = null;
+let watchId = null;
+
+export function startLocationTracking(onLocationUpdate) {
+  if (!navigator.geolocation) {
+    console.warn("El navegador no soporta geolocalización.");
+    return;
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const { latitude, longitude, heading } = position.coords;
+
+      // Muevo o creo el marcador del camión en la ubicación actual
+      if (userLocationMarker) {
+        userLocationMarker.setLatLng([latitude, longitude]);
+      } else {
+        userLocationMarker = window.L.marker([latitude, longitude], {
+          icon: createRouteStartIcon(heading ?? 0),
+          zIndexOffset: 1000,
+        }).addTo(map);
+      }
+
+      // Llamo al callback para que app.js actualice el input de origen
+      if (onLocationUpdate) {
+        onLocationUpdate({ lat: latitude, lon: longitude });
+      }
+    },
+    (error) => {
+      console.warn("Error de geolocalización:", error.message);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+      timeout: 10000,
+    }
+  );
+}
+
+export function stopLocationTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+}
