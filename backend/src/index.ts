@@ -8,6 +8,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import path from "path";
 import routeRouter from "./routes/route";
 import municipioParser from "./municipio-parser";
 import searchRouter from "./routes/search";
@@ -25,6 +26,8 @@ app.use("/api/search", searchRouter);
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "SafeTruck API" });
 });
+
+app.use(express.static(path.join(__dirname, "../../frontend")));
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

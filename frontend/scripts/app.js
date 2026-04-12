@@ -192,13 +192,13 @@ function renderSuggestions(field, suggestions) {
 
   const buttons = field.suggestions.querySelectorAll("button");
   buttons.forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // evita que el input pierda el foco antes de procesar el click
       const suggestion = suggestions[Number(button.dataset.index)];
       field.selectedLocation = suggestion;
       field.input.value = suggestion.label;
       setFieldStatus(field, formatConfirmedLocation(suggestion));
       clearSuggestions(field);
-      // Actualizo el trigger móvil si se seleccionó el destino
     });
   });
 }

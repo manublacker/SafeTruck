@@ -1,6 +1,6 @@
 import { fetchMockTruckRoute } from "./mockRouteService.js";
 
-const API_BASE_URL = "http://192.168.1.18:3000";
+const API_BASE_URL = "";
 // Mientras no exista backend real, dejamos activado el servicio simulado.
 const USE_MOCK_API = false;
 
