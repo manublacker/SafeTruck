@@ -17,12 +17,11 @@
       crossorigin=""
     />
     <link rel="stylesheet" href="./styles/main.css" />
+    <link rel="stylesheet" href="./styles/mobile.css" />
   </head>
   <body>
-    <!-- Pantalla principal: el mapa ocupa todo el fondo y los paneles flotan arriba. -->
     <main class="app-shell">
       <section class="map-shell">
-        <!-- Leaflet renderiza el mapa real de OpenStreetMap dentro de este div. -->
         <div id="route-map" aria-label="Mapa de rutas SafeTruck"></div>
         <div class="map-overlay"></div>
         <div class="map-legend">
@@ -31,7 +30,6 @@
         </div>
       </section>
 
-      <!-- Panel superior: formulario de búsqueda de ruta y configuración del camión. -->
       <section class="search-panel">
         <div class="brand-row">
           <div>
@@ -49,13 +47,7 @@
           <div class="location-field">
             <label class="field">
               <span>Origen</span>
-              <input
-                id="origin-input"
-                type="text"
-                value="Villa Devoto, Buenos Aires"
-                autocomplete="off"
-                required
-              />
+              <input id="origin-input" type="text" value="Villa Devoto, Buenos Aires" autocomplete="off" required />
             </label>
             <p id="origin-status" class="field-status">Escribí una dirección o lugar y elegí una sugerencia.</p>
             <ul id="origin-suggestions" class="suggestions-list" hidden></ul>
@@ -64,19 +56,12 @@
           <div class="location-field">
             <label class="field">
               <span>Destino</span>
-              <input
-                id="destination-input"
-                type="text"
-                value="Chacarita, Buenos Aires"
-                autocomplete="off"
-                required
-              />
+              <input id="destination-input" type="text" value="Chacarita, Buenos Aires" autocomplete="off" required />
             </label>
             <p id="destination-status" class="field-status">Vamos a usar coordenadas reales del lugar seleccionado.</p>
             <ul id="destination-suggestions" class="suggestions-list" hidden></ul>
           </div>
 
-          <!-- details/summary crea un bloque plegable nativo de HTML. -->
           <details class="truck-details">
             <summary>Perfil del camión y preferencias</summary>
             <div class="grid-2">
@@ -84,29 +69,24 @@
                 <span>Peso (kg)</span>
                 <input id="weight-input" type="number" value="12000" min="1" required />
               </label>
-
               <label class="field">
                 <span>Altura (m)</span>
                 <input id="height-input" type="number" value="4.1" min="0.1" step="0.1" required />
               </label>
-
               <label class="field">
                 <span>Ancho (m)</span>
                 <input id="width-input" type="number" value="2.5" min="0.1" step="0.1" required />
               </label>
-
               <label class="field">
                 <span>Largo (m)</span>
                 <input id="length-input" type="number" value="12" min="0.1" step="0.1" required />
               </label>
             </div>
-
             <div class="options">
               <label class="toggle">
                 <input id="avoid-tolls-input" type="checkbox" checked />
                 <span>Evitar peajes</span>
               </label>
-
               <label class="toggle">
                 <input id="prefer-highways-input" type="checkbox" checked />
                 <span>Preferir corredores</span>
@@ -114,13 +94,13 @@
             </div>
           </details>
 
-          <button id="submit-button" type="submit">Buscar ruta</button>
+          <button id="submit-button" type="submit">Calcular ruta</button>
         </form>
       </section>
 
-      <!-- Panel inferior: muestra resumen textual y lista de puntos de la ruta devuelta por la API/mock. -->
       <article class="route-sheet">
         <div class="sheet-handle"></div>
+        <button id="close-route-sheet" style="display:none">✕</button>
         <div class="sheet-header">
           <div>
             <p class="result-label">Ruta sugerida</p>
@@ -146,5 +126,105 @@
       crossorigin=""
     ></script>
     <script type="module" src="./scripts/app.js"></script>
+
+    <script>
+      if (window.innerWidth <= 768) {
+        // Barra superior
+        const bar = document.createElement("div");
+        bar.className = "mobile-bar";
+        bar.innerHTML = `
+          <span class="mobile-bar-logo">🚚 SafeTruck</span>
+          <button class="mobile-bar-search" id="mobile-open-btn">
+            🔍 ¿A dónde vas?
+          </button>
+        `;
+        document.body.appendChild(bar);
+
+        // Overlay
+        const overlay = document.createElement("div");
+        overlay.className = "mobile-overlay";
+        overlay.id = "mobile-overlay";
+        document.body.appendChild(overlay);
+
+        // Botón reabrir sheet
+        const reopenBtn = document.createElement("button");
+        reopenBtn.id = "reopen-route-btn";
+        reopenBtn.textContent = "Ver ruta";
+        reopenBtn.style.cssText = `
+          display: none;
+          position: fixed;
+          bottom: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 500;
+          padding: 12px 24px;
+          border-radius: 999px;
+          background: #1f6649;
+          color: white;
+          font-weight: 800;
+          font-size: 0.95rem;
+          border: none;
+          box-shadow: 0 8px 24px rgba(31,102,73,0.35);
+          cursor: pointer;
+          font-family: inherit;
+        `;
+        document.body.appendChild(reopenBtn);
+
+        // Botón cerrar sheet
+        const closeBtn = document.getElementById("close-route-sheet");
+        closeBtn.style.cssText = `
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: none;
+          background: #f1f5f1;
+          font-size: 1rem;
+          cursor: pointer;
+          padding: 0;
+          box-shadow: none;
+          color: #333;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        `;
+
+        function closeRouteSheet() {
+          document.querySelector(".route-sheet").classList.remove("visible");
+          reopenBtn.style.display = "block";
+        }
+
+        closeBtn.addEventListener("click", closeRouteSheet);
+        document.querySelector(".sheet-handle").addEventListener("click", closeRouteSheet);
+
+        reopenBtn.addEventListener("click", () => {
+          document.querySelector(".route-sheet").classList.add("visible");
+          reopenBtn.style.display = "none";
+        });
+
+        // Abrir panel de búsqueda
+        document.getElementById("mobile-open-btn").addEventListener("click", () => {
+          document.querySelector(".search-panel").classList.add("mobile-open");
+          overlay.classList.add("active");
+          setTimeout(() => document.getElementById("destination-input")?.focus(), 200);
+        });
+
+        // Cerrar panel al tocar overlay
+        overlay.addEventListener("click", () => {
+          document.querySelector(".search-panel").classList.remove("mobile-open");
+          overlay.classList.remove("active");
+        });
+
+        // Cerrar panel al calcular ruta
+        document.getElementById("route-form").addEventListener("submit", () => {
+          setTimeout(() => {
+            document.querySelector(".search-panel").classList.remove("mobile-open");
+            overlay.classList.remove("active");
+          }, 300);
+        });
+      }
+    </script>
   </body>
 </html>

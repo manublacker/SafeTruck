@@ -71,15 +71,15 @@ export function renderRouteMap(routeResponse) {
   });
   routeLayer.addTo(map);
 
-  // Marcador de origen.
-  originMarker = window.L.marker([originPoint.lat, originPoint.lon], {
-    icon: createRouteStartIcon(routeHeading),
-    title: originPoint.label,
-  })
-    .addTo(map)
-    .bindPopup(
-      `<strong>Inicio del trayecto</strong><br><span class="route-popup">${originPoint.label}</span>`
-    );
+    // Marcador de origen.
+    //originMarker = window.L.marker([originPoint.lat, originPoint.lon], {
+    //icon: createRouteStartIcon(routeHeading),
+    //title: originPoint.label,
+    //})
+    //.addTo(map)
+    //.bindPopup(
+      //`<strong>Inicio del trayecto</strong><br><span class="route-popup">${originPoint.label}</span>`
+     //);
 
   // Marcador de destino.
   destinationMarker = window.L.marker([destinationPoint.lat, destinationPoint.lon], {
