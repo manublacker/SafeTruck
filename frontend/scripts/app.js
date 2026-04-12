@@ -198,6 +198,7 @@ function renderSuggestions(field, suggestions) {
       field.input.value = suggestion.label;
       setFieldStatus(field, formatConfirmedLocation(suggestion));
       clearSuggestions(field);
+      // Actualizo el trigger móvil si se seleccionó el destino
     });
   });
 }
