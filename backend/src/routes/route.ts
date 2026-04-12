@@ -105,11 +105,29 @@ router.post("/", async (req: Request, res: Response) => {
 
     // Construyo el array de puntos de la ruta con las coordenadas reales de cada nodo
     // El frontend usa estos puntos para dibujar la ruta en el mapa
-    const path = resultado.path.map((nodeId: string) => ({
-      nodeId,
-      lat: grafo.nodes[nodeId].lat,
-      lon: grafo.nodes[nodeId].lon,
-      label: "",
+    const path = await Promise.all(resultado.path.map(async (nodeId: string, index: number) => {
+      let label = "";
+      // Para cada par de nodos consecutivos, busco el nombre de la calle que los une
+      if (index < resultado.path.length - 1) {
+        const siguienteId = resultado.path[index + 1];
+        const resNombre = await pool.query(
+          `SELECT rv.nombre_buscable 
+           FROM aristas a
+           JOIN red_vial rv ON rv.id = a.red_vial_id
+           WHERE a.source = $1::integer AND a.target = $2::integer
+           ORDER BY a.costo ASC LIMIT 1`,
+          [nodeId, siguienteId]
+        );
+        if (resNombre.rows.length > 0) {
+          label = resNombre.rows[0].nombre_buscable ?? "";
+        }
+      }
+      return {
+        nodeId,
+        lat: grafo.nodes[nodeId].lat,
+        lon: grafo.nodes[nodeId].lon,
+        label,
+      };
     }));
   // Calculo la distancia real recorriendo las aristas del path
   // sin contar las penalizaciones artificiales del A*
@@ -118,9 +136,9 @@ router.post("/", async (req: Request, res: Response) => {
     const desde = resultado.path[i];
     const hasta = resultado.path[i + 1];
     const resArista = await pool.query(
-      `SELECT costo FROM aristas 
-      WHERE source = $1::integer AND target = $2::integer 
-      ORDER BY costo ASC LIMIT 1`,
+      `SELECT LEAST(costo, 10000) AS costo FROM aristas 
+       WHERE source = $1::integer AND target = $2::integer 
+       ORDER BY costo ASC LIMIT 1`,
       [desde, hasta]
     );
     if (resArista.rows.length > 0) {

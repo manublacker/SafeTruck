@@ -447,4 +447,25 @@ button:disabled {
     left: 12px;
     bottom: calc(48vh + 12px);
   }
+
+  @media (max-width: 760px) {
+    .search-panel {
+      top: 0;
+      left: 0;
+      right: 0;
+      width: 100vw;
+      border-radius: 0 0 28px 28px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+  
+    .route-sheet {
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+  
+    .route-sheet.visible {
+      transform: translateY(0);
+    }
+  }
 }

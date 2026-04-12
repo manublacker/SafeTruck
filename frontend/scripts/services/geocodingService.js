@@ -1,4 +1,4 @@
-const BACKEND_URL = "http://localhost:3000";
+const BACKEND_URL = "http://192.168.1.18:3000";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
 function normalizeQuery(query) {

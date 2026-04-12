@@ -18,21 +18,58 @@ export function renderRouteSummary(routeResponse) {
     routeResponse.distanceM
   )}. Tiempo estimado: ${routeResponse.estimatedDurationMin} min.`;
 
-  // Se arma una lista HTML con cada punto del recorrido y sus coordenadas.
-  routeSteps.innerHTML = routeResponse.path
-    .map(
-      (point, index) =>
-        `<li><strong>${index + 1}.</strong> ${point.label} <small>(${point.lat.toFixed(
-          4
-        )}, ${point.lon.toFixed(4)})</small></li>`
-    )
-    .join("");
+  // Agrupo nodos consecutivos por nombre de calle para generar instrucciones
+  const instrucciones = [];
+  let calleActual = null;
+  let distanciaActual = 0;
+
+  for (let i = 0; i < routeResponse.path.length - 1; i++) {
+    const punto = routeResponse.path[i];
+    const siguiente = routeResponse.path[i + 1];
+    const calle = punto.label || "Calle sin nombre";
+
+    const dLat = (siguiente.lat - punto.lat) * Math.PI / 180;
+    const dLon = (siguiente.lon - punto.lon) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(punto.lat * Math.PI/180) * Math.cos(siguiente.lat * Math.PI/180) * Math.sin(dLon/2)**2;
+    const distM = 6371000 * 2 * Math.asin(Math.sqrt(a));
+
+    if (calle === calleActual) {
+      distanciaActual += distM;
+    } else {
+      if (calleActual !== null) {
+        instrucciones.push({ calle: calleActual, distanciaM: distanciaActual });
+      }
+      calleActual = calle;
+      distanciaActual = distM;
+    }
+  }
+  if (calleActual) instrucciones.push({ calle: calleActual, distanciaM: distanciaActual });
+
+  routeSteps.innerHTML = instrucciones
+  .filter(inst => inst.calle !== "Calle sin nombre")
+  .map((inst, index) => {
+    const dist = inst.distanciaM >= 1000
+      ? `${(inst.distanciaM / 1000).toFixed(1)} km`
+      : `${Math.round(inst.distanciaM)} m`;
+    const accion = index === 0 ? "Salir por" : "Continuar por";
+    return `<li><strong>${accion}</strong> ${toTitleCase(inst.calle)} <small>${dist}</small></li>`;
+  })
+  .join("");
 
   if (routeResponse.warnings?.length) {
     routeSteps.innerHTML += routeResponse.warnings
       .map((warning) => `<li class="warning-item">${warning}</li>`)
       .join("");
   }
+} 
+function toTitleCase(str) {
+  const minusculas = new Set(["de", "del", "la", "las", "el", "los", "y", "en", "a", "al"]);
+  return str
+    .toLowerCase()
+    .replace(/\b\w+/g, (word, offset) => {
+      if (offset === 0) return word.charAt(0).toUpperCase() + word.slice(1);
+      return minusculas.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1);
+    });
 }
 
 // Cambia el estado visual del botón mientras la ruta "se calcula".
@@ -46,10 +83,8 @@ function renderWarnings(warnings = []) {
 }
 
 function formatDistance(distanceM) {
-  // Muestra metros o kilómetros según la magnitud de la distancia.
   if (distanceM >= 1000) {
     return `${(distanceM / 1000).toFixed(2)} km`;
   }
-
   return `${Math.round(distanceM)} m`;
 }
