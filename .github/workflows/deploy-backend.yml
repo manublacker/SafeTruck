@@ -66,13 +66,17 @@ jobs:
 
       - name: Deploy to Container Apps
         run: |
+          az containerapp registry set \
+            --name "${{ vars.BACKEND_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "ghcr.io" \
+            --username "${{ github.actor }}" \
+            --password "${{ secrets.GHCR_PAT }}"
+
           az containerapp update \
             --name "${{ vars.BACKEND_APP_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "ghcr.io/${{ github.repository_owner }}/safetruck-backend:${{ github.sha }}" \
-            --registry-server "ghcr.io" \
-            --registry-username "${{ github.actor }}" \
-            --registry-password "${{ secrets.GHCR_PAT }}" \
             --output none
 
       - name: Verify deployment

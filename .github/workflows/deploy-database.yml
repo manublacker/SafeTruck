@@ -169,13 +169,17 @@ jobs:
 
       - name: Update safetruck-db Container App
         run: |
+          az containerapp registry set \
+            --name "${{ vars.DB_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "ghcr.io" \
+            --username "${{ github.actor }}" \
+            --password "${{ secrets.GHCR_PAT }}"
+
           az containerapp update \
             --name "${{ vars.DB_APP_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --image "${{ needs.build-db.outputs.image_tag }}" \
-            --registry-server "ghcr.io" \
-            --registry-username "${{ github.actor }}" \
-            --registry-password "${{ secrets.GHCR_PAT }}"
+            --image "${{ needs.build-db.outputs.image_tag }}"
 
       - name: Wait for Container App to be ready
         run: |
@@ -206,13 +210,17 @@ jobs:
 
       - name: Update init Job image
         run: |
+          az containerapp job registry set \
+            --name "${{ vars.DB_INIT_JOB_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "ghcr.io" \
+            --username "${{ github.actor }}" \
+            --password "${{ secrets.GHCR_PAT }}"
+
           az containerapp job update \
             --name "${{ vars.DB_INIT_JOB_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --image "${{ needs.build-init.outputs.image_tag }}" \
-            --registry-server "ghcr.io" \
-            --registry-username "${{ github.actor }}" \
-            --registry-password "${{ secrets.GHCR_PAT }}"
+            --image "${{ needs.build-init.outputs.image_tag }}"
 
       - name: Trigger init Job execution
         run: |
