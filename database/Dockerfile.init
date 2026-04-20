@@ -9,6 +9,9 @@
 #   2. Genera la topología pgRouting (02_topology.sql)
 #   3. Aplica restricciones de camiones (03_restrictions.sql)
 #   4. Crea vistas y funciones del backend (04_backend_views.sql)
+#   5. Crea índices de búsqueda (05_search.sql)
+#   6. Importa red de camiones KML (06_importar_red_camiones_kml.sql)
+#   7. Crea tabla de usuarios (07_users.sql)
 #
 # El contexto de build es la raíz de SafeTruck (ver docker-compose.yml).
 # ──────────────────────────────────────────────────────────────
@@ -30,11 +33,13 @@ COPY database/tsconfig-init.json ./tsconfig.json
 # Script de importación de datos
 COPY database/docker-seed.ts ./docker-seed.ts
 
-# Scripts SQL de los pasos 2–5
-COPY database/sql/02_topology.sql     /sql/02_topology.sql
-COPY database/sql/03_restrictions.sql  /sql/03_restrictions.sql
-COPY database/sql/04_backend_views.sql /sql/04_backend_views.sql
-COPY database/sql/05_search.sql        /sql/05_search.sql
+# Scripts SQL
+COPY database/sql/02_topology.sql              /sql/02_topology.sql
+COPY database/sql/03_restrictions.sql          /sql/03_restrictions.sql
+COPY database/sql/04_backend_views.sql         /sql/04_backend_views.sql
+COPY database/sql/05_search.sql                /sql/05_search.sql
+COPY database/sql/06_importar_red_camiones_kml.sql /sql/06_importar_red_camiones_kml.sql
+COPY database/sql/07_users.sql                 /sql/07_users.sql
 
 # Datos GeoJSON
 COPY database/data /data

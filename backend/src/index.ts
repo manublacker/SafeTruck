@@ -14,16 +14,14 @@ import swaggerSpec from "./swagger";
 import routeRouter from "./routes/route";
 import municipioParser from "./municipio-parser";
 import searchRouter from "./routes/search";
+import authRouter from "./routes/auth";
+import { authMiddleware } from "./middleware/authMiddleware";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
-
-// Indico a Express que los requests van a tener cuerpo en formato JSON
-// Sin esto, req.body llega undefined
-app.use(express.json());
 
 // Swagger UI: documentación interactiva en /api/docs
 app.use(
@@ -41,7 +39,21 @@ app.get("/api/docs.json", (_req, res) => {
   res.send(swaggerSpec);
 });
 
-// Registro el router de ruteo bajo el prefijo /api/routes
+// Rutas públicas — sin token requerido
+app.use("/api/auth", authRouter);
+
+// Guard JWT: protege todas las rutas /api/* excepto /api/auth y /api/docs
+app.use("/api", (req, res, next) => {
+  if (
+    req.path.startsWith("/auth") ||
+    req.path.startsWith("/docs")
+  ) {
+    return next();
+  }
+  return authMiddleware(req, res, next);
+});
+
+// Rutas protegidas
 app.use("/api/routes", routeRouter);
 app.use("/api/municipio", municipioParser);
 app.use("/api/search", searchRouter);

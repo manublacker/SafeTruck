@@ -1,0 +1,54 @@
+# docker-compose.dev.yml - SafeTruck (modo desarrollo)
+#
+# Solo levanta la BD. El app Next.js corre localmente con npm run dev.
+#
+# Uso:
+#   docker compose -f docker-compose.dev.yml up
+#
+# En otra terminal:
+#   cd safetruck-next
+#   npm install
+#   npm run dev
+
+services:
+
+  db:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    container_name: safetruck-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       safetruck
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d safetruck"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  db-init:
+    build:
+      context: .
+      dockerfile: database/Dockerfile.init
+    container_name: safetruck-db-init
+    restart: "no"
+    environment:
+      PGHOST:     db
+      PGPORT:     5432
+      PGDATABASE: safetruck
+      PGUSER:     postgres
+      PGPASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    name: safetruck-pgdata

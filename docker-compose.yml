@@ -1,0 +1,80 @@
+# docker-compose.yml - SafeTruck
+#
+# Servicios:
+#   db        -> PostgreSQL 15 + PostGIS + pgRouting
+#   db-init   -> Inicializa la BD (corre una sola vez y sale)
+#   app       -> Next.js 15 (frontend + backend en un solo proceso)
+#
+# Orden de arranque:
+#   db  ->  db-init  ->  app
+#
+# Primer uso:
+#   docker compose up --build
+#
+# Usos posteriores (datos ya cargados en el volumen):
+#   docker compose up --build --scale db-init=0
+
+services:
+
+  # Base de datos
+  db:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    container_name: safetruck-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       safetruck
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d safetruck"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # Inicializacion de la BD (corre una sola vez)
+  db-init:
+    build:
+      context: .
+      dockerfile: database/Dockerfile.init
+    container_name: safetruck-db-init
+    restart: "no"
+    environment:
+      PGHOST:     db
+      PGPORT:     5432
+      PGDATABASE: safetruck
+      PGUSER:     postgres
+      PGPASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Aplicacion Next.js
+  app:
+    build:
+      context: ./safetruck-next
+      dockerfile: Dockerfile
+    container_name: safetruck-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV:    production
+      DB_HOST:     db
+      DB_PORT:     5432
+      DB_NAME:     safetruck
+      DB_USER:     postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+    name: safetruck-pgdata

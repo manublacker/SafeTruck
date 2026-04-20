@@ -32,8 +32,89 @@ const options: swaggerJsdoc.Options = {
         description: "Servidor de desarrollo",
       },
     ],
+    security: [{ bearerAuth: [] }],
     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Token JWT obtenido en /api/auth/login o /api/auth/register",
+        },
+      },
       schemas: {
+        TruckInput: {
+          type: "object",
+          required: ["name", "max_weight_kg", "max_height_m", "max_width_m", "max_length_m"],
+          properties: {
+            name:           { type: "string",  example: "Volvo FH #1" },
+            max_weight_kg:  { type: "number",  example: 12000, description: "Peso máximo en kg" },
+            max_height_m:   { type: "number",  example: 4.1,   description: "Altura máxima en metros" },
+            max_width_m:    { type: "number",  example: 2.5,   description: "Ancho máximo en metros" },
+            max_length_m:   { type: "number",  example: 12,    description: "Largo máximo en metros" },
+          },
+        },
+        TruckResponse: {
+          type: "object",
+          properties: {
+            id:             { type: "integer", example: 1 },
+            name:           { type: "string",  example: "Volvo FH #1" },
+            max_weight_kg:  { type: "number",  example: 12000 },
+            max_height_m:   { type: "number",  example: 4.1 },
+            max_width_m:    { type: "number",  example: 2.5 },
+            max_length_m:   { type: "number",  example: 12 },
+            created_at:     { type: "string",  format: "date-time" },
+          },
+        },
+        RegisterRequest: {
+          type: "object",
+          required: ["email", "password", "full_name"],
+          properties: {
+            email:     { type: "string", format: "email", example: "juan@empresa.com" },
+            password:  { type: "string", minLength: 6,    example: "secreto123" },
+            full_name: { type: "string", example: "Juan Pérez" },
+            company:   { type: "string", example: "Transportes SA", nullable: true },
+            trucks: {
+              type: "array",
+              items: { $ref: "#/components/schemas/TruckInput" },
+              description: "Camiones iniciales del usuario (opcional)",
+            },
+          },
+        },
+        LoginRequest: {
+          type: "object",
+          required: ["email", "password"],
+          properties: {
+            email:    { type: "string", format: "email", example: "juan@empresa.com" },
+            password: { type: "string", example: "secreto123" },
+          },
+        },
+        AuthUser: {
+          type: "object",
+          properties: {
+            id:        { type: "integer", example: 1 },
+            email:     { type: "string",  example: "juan@empresa.com" },
+            full_name: { type: "string",  example: "Juan Pérez" },
+            company:   { type: "string",  example: "Transportes SA", nullable: true },
+            trucks: {
+              type: "array",
+              items: { $ref: "#/components/schemas/TruckResponse" },
+            },
+          },
+        },
+        AuthResponse: {
+          type: "object",
+          properties: {
+            token: { type: "string", example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+            user:  { $ref: "#/components/schemas/AuthUser" },
+          },
+        },
+        AuthError: {
+          type: "object",
+          properties: {
+            error: { type: "string", example: "Credenciales inválidas." },
+          },
+        },
         Coordinates: {
           type: "object",
           required: ["lat", "lon"],
@@ -145,6 +226,89 @@ const options: swaggerJsdoc.Options = {
       },
     },
     paths: {
+      "/api/auth/register": {
+        post: {
+          tags: ["Autenticación"],
+          summary: "Registrar nuevo usuario",
+          description:
+            "Crea una cuenta nueva con email y contraseña. " +
+            "Opcionalmente acepta una lista de camiones para registrar junto con el usuario. " +
+            "Devuelve un token JWT válido por 24 horas.",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/RegisterRequest" },
+                example: {
+                  email: "juan@empresa.com",
+                  password: "secreto123",
+                  full_name: "Juan Pérez",
+                  company: "Transportes SA",
+                  trucks: [
+                    { name: "Volvo FH #1", max_weight_kg: 12000, max_height_m: 4.1, max_width_m: 2.5, max_length_m: 12 },
+                  ],
+                },
+              },
+            },
+          },
+          responses: {
+            201: {
+              description: "Usuario registrado correctamente",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthResponse" } } },
+            },
+            400: {
+              description: "Campos inválidos o faltantes",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthError" } } },
+            },
+            409: {
+              description: "El email ya está registrado",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthError" } } },
+            },
+            500: {
+              description: "Error interno del servidor",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthError" } } },
+            },
+          },
+        },
+      },
+      "/api/auth/login": {
+        post: {
+          tags: ["Autenticación"],
+          summary: "Iniciar sesión",
+          description:
+            "Verifica las credenciales y devuelve un token JWT válido por 24 horas " +
+            "junto con el perfil del usuario y sus camiones registrados.",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/LoginRequest" },
+                example: { email: "juan@empresa.com", password: "secreto123" },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Login exitoso",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthResponse" } } },
+            },
+            400: {
+              description: "Campos faltantes",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthError" } } },
+            },
+            401: {
+              description: "Credenciales inválidas",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthError" } } },
+            },
+            500: {
+              description: "Error interno del servidor",
+              content: { "application/json": { schema: { $ref: "#/components/schemas/AuthError" } } },
+            },
+          },
+        },
+      },
       "/health": {
         get: {
           tags: ["Sistema"],
@@ -161,6 +325,7 @@ const options: swaggerJsdoc.Options = {
       "/api/routes": {
         post: {
           tags: ["Ruteo"],
+          security: [{ bearerAuth: [] }],
           summary: "Calcular ruta para camión",
           description:
             "Recibe coordenadas de origen y destino junto con el perfil del camión. " +
@@ -205,6 +370,7 @@ const options: swaggerJsdoc.Options = {
       "/api/search": {
         get: {
           tags: ["Geocodificación"],
+          security: [{ bearerAuth: [] }],
           summary: "Buscar calles por nombre",
           description:
             "Busca calles en la red vial usando similitud de trigramas (pg_trgm) sobre el " +
