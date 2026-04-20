@@ -16,9 +16,3 @@ cache/
 # Next.js build output
 .next/
 safetruck-next/.next/
-
-# datasets pesados
-database/data/**/*.geojson
-database/base/**/*.geojson
-*.geojson
-database/graph.json

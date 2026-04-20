@@ -8,7 +8,7 @@ Azure Container Apps Environment: safetruck-env  (canadacentral)
 ├─ Container App: safetruck-db                    ← PostgreSQL 15 + PostGIS + pgRouting
 │    Image:   ghcr.io/sergioslo/safetruck-db:latest
 │    Ingress: interno TCP, exposedPort 5432
-│    Volume:  Azure Files → /var/lib/postgresql/data (persistente, 32 GB)
+│    Storage: efímero (sin volumen persistente — ver nota abajo)
 │    FQDN interno: safetruck-db.internal.icysky-af60cdde.canadacentral.azurecontainerapps.io
 │
 ├─ Container Apps Job: safetruck-db-init          ← one-shot: importa GeoJSONs + corre SQLs
@@ -24,9 +24,14 @@ Azure Container Apps Environment: safetruck-env  (canadacentral)
 
 Recursos de soporte:
   Registry:       GitHub Container Registry (ghcr.io/sergioslo)
-  Storage:        Azure Storage Account sta375aa1c10
-  Azure Files:    safetruck-pgdata (32 GB)
   Resource Group: safetruck-rg  (canadacentral)
+
+⚠️  Nota sobre persistencia de datos:
+  Azure Files (SMB) no soporta chmod, que PostgreSQL requiere para initdb.
+  Los datos de la DB viven en el storage efímero del container. Si el container
+  es reemplazado por una nueva revisión (deploy o reinicio), hay que volver a
+  correr el init job manualmente:
+    az containerapp job start --name safetruck-db-init --resource-group safetruck-rg
 ```
 
 > **Nota:** Se usa GitHub Container Registry en lugar de Azure Container Registry porque
@@ -215,5 +220,4 @@ az containerapp update \
 | Container App safetruck-db (0.5 CPU / 1 GB) | ~$15 |
 | Container App safetruck-backend (0.5 CPU / 1 GB) | ~$15 |
 | Container Apps Job safetruck-db-init (solo cuando corre) | < $1 |
-| Azure Storage (32 GB Azure Files) | ~$2 |
-| **Total estimado** | **~$32/mes** |
+| **Total estimado** | **~$30/mes** |

@@ -27,10 +27,6 @@ set -euo pipefail
 
 RESOURCE_GROUP="safetruck-rg"
 LOCATION="canadacentral"
-FILE_SHARE_NAME="safetruck-pgdata"
-# Nombre único derivado del subscription ID (evita conflictos entre corridas)
-_SUB_ID=$(az account show --query id -o tsv 2>/dev/null || echo "00000000")
-STORAGE_ACCOUNT="st$(echo "$_SUB_ID" | tr -d '-' | cut -c1-10)"
 ACA_ENVIRONMENT="safetruck-env"
 DB_APP_NAME="safetruck-db"
 DB_INIT_JOB_NAME="safetruck-db-init"
@@ -86,37 +82,13 @@ read -rp "¿Continuar? (s/n) " -n 1 REPLY; echo
 
 # ── 1. Resource Group ─────────────────────────────────────────────────────────
 
-log "[1/8] Creando Resource Group..."
+log "[1/6] Creando Resource Group..."
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output none
 ok "Resource Group: $RESOURCE_GROUP"
 
-# ── 2. Storage Account + Azure Files ─────────────────────────────────────────
+# ── 2. Container Apps Environment ─────────────────────────────────────────────
 
-log "[2/8] Creando Storage Account para volumen de PostgreSQL..."
-az storage account create \
-  --name "$STORAGE_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --location "$LOCATION" \
-  --sku Standard_LRS \
-  --kind StorageV2 \
-  --output none
-
-STORAGE_KEY=$(az storage account keys list \
-  --resource-group "$RESOURCE_GROUP" \
-  --account-name "$STORAGE_ACCOUNT" \
-  --query "[0].value" -o tsv)
-
-az storage share create \
-  --name "$FILE_SHARE_NAME" \
-  --account-name "$STORAGE_ACCOUNT" \
-  --account-key "$STORAGE_KEY" \
-  --quota 32 \
-  --output none
-ok "Azure Files share: $FILE_SHARE_NAME (32 GB)"
-
-# ── 3. Container Apps Environment ─────────────────────────────────────────────
-
-log "[3/8] Creando Container Apps Environment..."
+log "[2/6] Creando Container Apps Environment..."
 az containerapp env create \
   --name "$ACA_ENVIRONMENT" \
   --resource-group "$RESOURCE_GROUP" \
@@ -124,27 +96,20 @@ az containerapp env create \
   --output none
 ok "Container Apps Environment: $ACA_ENVIRONMENT"
 
-# Montar el Azure Files share como volumen en el environment
-az containerapp env storage set \
-  --name "$ACA_ENVIRONMENT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --storage-name "pgdata" \
-  --azure-file-account-name "$STORAGE_ACCOUNT" \
-  --azure-file-account-key "$STORAGE_KEY" \
-  --azure-file-share-name "$FILE_SHARE_NAME" \
-  --access-mode ReadWrite \
-  --output none
-ok "Azure Files montado en environment como 'pgdata'"
+# NOTA: No usamos Azure Files para el volumen de PostgreSQL.
+# Azure Files (SMB) no soporta chmod, que PostgreSQL requiere para initdb.
+# Los datos viven en el storage efímero del container. Si el container es
+# reemplazado (nueva revisión), hay que volver a correr el init job.
 
 # ── 4. Login a ghcr.io y build de imágenes ───────────────────────────────────
 
-log "[4/8] Autenticando Docker en ghcr.io..."
+log "[3/6] Autenticando Docker en ghcr.io..."
 echo "$GITHUB_PAT" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
 ok "Docker autenticado en ghcr.io"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-log "[5/8] Build y push de safetruck-db..."
+log "[4/6] Build y push de safetruck-db..."
 docker build \
   -t "${GHCR_IMAGE_DB}:latest" \
   -f "${REPO_ROOT}/database/Dockerfile" \
@@ -152,7 +117,7 @@ docker build \
 docker push "${GHCR_IMAGE_DB}:latest"
 ok "Imagen safetruck-db publicada en ghcr.io"
 
-log "[6/8] Build y push de safetruck-db-init..."
+log "[4/6] Build y push de safetruck-db-init..."
 docker build \
   -t "${GHCR_IMAGE_INIT}:latest" \
   -f "${REPO_ROOT}/database/Dockerfile.init" \
@@ -162,7 +127,7 @@ ok "Imagen safetruck-db-init publicada en ghcr.io"
 
 # ── 5. Container App: safetruck-db (via az rest + JSON para volume mounts) ────
 
-log "[7/8] Creando Container App safetruck-db..."
+log "[5/6] Creando Container App safetruck-db..."
 
 ENV_ID=$(az containerapp env show \
   --name "$ACA_ENVIRONMENT" \
@@ -206,14 +171,10 @@ cat > "./safetruck-db-arm.json" << EOF
             { "name": "POSTGRES_USER",     "value": "${POSTGRES_USER}" },
             { "name": "POSTGRES_PASSWORD", "secretRef": "pgpassword" }
           ],
-          "volumeMounts": [
-            { "volumeName": "pgdata", "mountPath": "/var/lib/postgresql/data" }
-          ]
+          "volumeMounts": []
         }
       ],
-      "volumes": [
-        { "name": "pgdata", "storageType": "AzureFile", "storageName": "pgdata" }
-      ],
+      "volumes": [],
       "scale": { "minReplicas": 1, "maxReplicas": 1 }
     }
   }
@@ -231,7 +192,7 @@ ok "Container App safetruck-db creado"
 
 # ── 6. Container Apps Job: safetruck-db-init ──────────────────────────────────
 
-log "[8/8] Creando Container Apps Job safetruck-db-init..."
+log "[6/6] Creando Container Apps Job safetruck-db-init..."
 
 # El job no necesita volumen (solo conecta a la BD y corre scripts)
 az containerapp job create \
@@ -309,3 +270,4 @@ echo "  Seguí el init job con:"
 echo "  az containerapp job execution list --name ${DB_INIT_JOB_NAME} --resource-group ${RESOURCE_GROUP} --output table"
 echo ""
 echo "══════════════════════════════════════════════════════════════"
+ 
