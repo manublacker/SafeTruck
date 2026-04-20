@@ -1,0 +1,253 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# deploy-database.yml
+#
+# CI/CD para el stack de base de datos de SafeTruck en Azure Container Apps.
+# Usa GitHub Container Registry (ghcr.io) como registry de imágenes.
+#
+# Dos imágenes Docker, dos flujos independientes:
+#
+#   safetruck-db      (Dockerfile)
+#   ├─ Se reconstruye cuando cambia: Dockerfile, 01_schema.sql
+#   └─ Deploy: actualiza el Container App (el volumen de datos persiste)
+#
+#   safetruck-db-init  (Dockerfile.init)
+#   ├─ Se reconstruye cuando cambia: Dockerfile.init, docker-seed.ts,
+#   │  docker-init.sh, sql/02-05, data/**
+#   └─ Deploy: sube la imagen y ejecuta un Container Apps Job.
+#              docker-init.sh es idempotente: salta si la BD ya está cargada.
+#
+# Secrets requeridos en GitHub → Settings → Secrets and variables → Actions:
+#   AZURE_CREDENTIALS      ← JSON del service principal de Azure
+#   PGPASSWORD             ← contraseña de PostgreSQL (generada por provision.sh)
+#   GHCR_PAT               ← GitHub PAT con scope write:packages
+#                            (para que Azure Container Apps pueda leer las imágenes)
+#
+# Variables requeridas:
+#   AZURE_RESOURCE_GROUP   ← safetruck-rg
+#   ACA_ENVIRONMENT        ← safetruck-env
+#   DB_APP_NAME            ← safetruck-db
+#   DB_INIT_JOB_NAME       ← safetruck-db-init
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Deploy Database
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "database/**"
+      - ".github/workflows/deploy-database.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-database
+  cancel-in-progress: false
+
+# Permisos para escribir en ghcr.io con GITHUB_TOKEN
+permissions:
+  contents: read
+  packages: write
+
+# ── Job 1: Detectar qué cambió ────────────────────────────────────────────────
+jobs:
+  detect-changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      db_image:   ${{ steps.filter.outputs.db_image }}
+      init_image: ${{ steps.filter.outputs.init_image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Filter paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            db_image:
+              - "database/Dockerfile"
+              - "database/sql/01_schema.sql"
+            init_image:
+              - "database/Dockerfile.init"
+              - "database/docker-seed.ts"
+              - "database/docker-init.sh"
+              - "database/package-init.json"
+              - "database/tsconfig-init.json"
+              - "database/sql/02_topology.sql"
+              - "database/sql/03_restrictions.sql"
+              - "database/sql/04_backend_views.sql"
+              - "database/sql/05_search.sql"
+              - "database/data/**"
+
+# ── Job 2: Build + push safetruck-db ─────────────────────────────────────────
+  build-db:
+    name: Build safetruck-db image
+    needs: detect-changes
+    if: needs.detect-changes.outputs.db_image == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/safetruck-db"
+          echo "tag=${IMAGE}:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "latest=${IMAGE}:latest"         >> $GITHUB_OUTPUT
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Contexto de build: database/ (el Dockerfile hace COPY sql/...)
+      - name: Build and push safetruck-db
+        uses: docker/build-push-action@v5
+        with:
+          context: database
+          file: database/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/safetruck-db:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/safetruck-db:latest
+          cache-to: type=inline
+
+# ── Job 3: Build + push safetruck-db-init ────────────────────────────────────
+  build-init:
+    name: Build safetruck-db-init image
+    needs: detect-changes
+    if: needs.detect-changes.outputs.init_image == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/safetruck-db-init"
+          echo "tag=${IMAGE}:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Contexto de build: raíz del repo (Dockerfile.init hace COPY database/...)
+      - name: Build and push safetruck-db-init
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: database/Dockerfile.init
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/safetruck-db-init:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/safetruck-db-init:latest
+          cache-to: type=inline
+
+# ── Job 4: Actualizar Container App safetruck-db ──────────────────────────────
+  deploy-db:
+    name: Deploy safetruck-db to Container Apps
+    needs: build-db
+    if: needs.build-db.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Update safetruck-db Container App
+        run: |
+          az containerapp update \
+            --name "${{ vars.DB_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "${{ needs.build-db.outputs.image_tag }}" \
+            --registry-server "ghcr.io" \
+            --registry-username "${{ github.actor }}" \
+            --registry-password "${{ secrets.GHCR_PAT }}"
+
+      - name: Wait for Container App to be ready
+        run: |
+          echo "Esperando que safetruck-db esté Running..."
+          for i in $(seq 1 20); do
+            STATUS=$(az containerapp show \
+              --name "${{ vars.DB_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --query "properties.runningStatus" -o tsv 2>/dev/null || echo "Unknown")
+            echo "  intento $i — estado: $STATUS"
+            [ "$STATUS" = "Running" ] && break
+            sleep 10
+          done
+
+# ── Job 5: Actualizar imagen del Job y ejecutar init ─────────────────────────
+  run-init-job:
+    name: Run safetruck-db-init Job
+    needs: [build-init, deploy-db]
+    if: |
+      always() &&
+      needs.build-init.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Update init Job image
+        run: |
+          az containerapp job update \
+            --name "${{ vars.DB_INIT_JOB_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "${{ needs.build-init.outputs.image_tag }}" \
+            --registry-server "ghcr.io" \
+            --registry-username "${{ github.actor }}" \
+            --registry-password "${{ secrets.GHCR_PAT }}"
+
+      - name: Trigger init Job execution
+        run: |
+          EXECUTION=$(az containerapp job start \
+            --name "${{ vars.DB_INIT_JOB_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "name" -o tsv)
+          echo "Ejecución iniciada: $EXECUTION"
+          echo "EXECUTION_NAME=$EXECUTION" >> $GITHUB_ENV
+
+      - name: Wait for Job to complete
+        run: |
+          echo "Esperando que el job de init finalice..."
+          for i in $(seq 1 60); do
+            STATUS=$(az containerapp job execution show \
+              --name "${{ vars.DB_INIT_JOB_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --job-execution-name "$EXECUTION_NAME" \
+              --query "properties.status" -o tsv 2>/dev/null || echo "Unknown")
+            echo "  intento $i — estado: $STATUS"
+            case "$STATUS" in
+              Succeeded) echo "✅ Init job completado exitosamente."; exit 0 ;;
+              Failed)    echo "❌ Init job falló."; exit 1 ;;
+              Degraded)  echo "⚠️  Init job degradado."; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "⏱️  Timeout esperando el job de init."
+          exit 1
+
+      - name: Show Job logs on failure
+        if: failure()
+        run: |
+          echo "=== Logs del job de init ==="
+          az containerapp job execution logs show \
+            --name "${{ vars.DB_INIT_JOB_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --execution "$EXECUTION_NAME" 2>/dev/null || echo "(logs no disponibles)"

@@ -1,0 +1,92 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# deploy-backend.yml
+#
+# CI/CD del backend Node.js de SafeTruck.
+# Se activa en cada push a main que toque archivos de /backend.
+#
+# Secrets requeridos (los mismos que deploy-database.yml):
+#   AZURE_CREDENTIALS    ← JSON del service principal
+#   GHCR_PAT             ← GitHub PAT con write:packages
+#
+# Variables requeridas:
+#   AZURE_RESOURCE_GROUP ← safetruck-rg
+#   BACKEND_APP_NAME     ← safetruck-backend
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    name: Build, push and deploy safetruck-backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push safetruck-backend
+        uses: docker/build-push-action@v5
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/safetruck-backend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/safetruck-backend:latest
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/safetruck-backend:latest
+          cache-to: type=inline
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name "${{ vars.BACKEND_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "ghcr.io/${{ github.repository_owner }}/safetruck-backend:${{ github.sha }}" \
+            --registry-server "ghcr.io" \
+            --registry-username "${{ github.actor }}" \
+            --registry-password "${{ secrets.GHCR_PAT }}" \
+            --output none
+
+      - name: Verify deployment
+        run: |
+          echo "Esperando que el backend esté disponible..."
+          FQDN=$(az containerapp show \
+            --name "${{ vars.BACKEND_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${FQDN}/health" || echo "000")
+            echo "  intento $i — HTTP $STATUS"
+            [ "$STATUS" = "200" ] && echo "✅ Backend online: https://${FQDN}" && exit 0
+            sleep 10
+          done
+          echo "⚠️  El backend no respondió en 2 minutos. Revisá los logs en Azure."

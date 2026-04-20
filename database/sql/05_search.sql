@@ -10,6 +10,12 @@
 CREATE EXTENSION IF NOT EXISTS unaccent;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+-- unaccent no es IMMUTABLE por defecto; creamos un wrapper para poder
+-- usarlo en índices funcionales y en consultas de similitud.
+CREATE OR REPLACE FUNCTION unaccent_immutable(TEXT)
+RETURNS TEXT LANGUAGE SQL IMMUTABLE STRICT AS
+$$ SELECT unaccent($1) $$;
+
 -- -------------------------------------------------------
 -- Columna de nombre normalizado
 --

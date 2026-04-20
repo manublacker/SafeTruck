@@ -1,0 +1,47 @@
+# ──────────────────────────────────────────────────────────────
+# Dockerfile.init — safetruck-db-init
+#
+# Contenedor de un solo uso que inicializa la base de datos.
+# Corre UNA VEZ, completa el setup y sale (exit 0).
+#
+# Qué hace:
+#   1. Importa los GeoJSON a red_vial y red_camiones (docker-seed.ts)
+#   2. Genera la topología pgRouting (02_topology.sql)
+#   3. Aplica restricciones de camiones (03_restrictions.sql)
+#   4. Crea vistas y funciones del backend (04_backend_views.sql)
+#
+# El contexto de build es la raíz de SafeTruck (ver docker-compose.yml).
+# ──────────────────────────────────────────────────────────────
+
+FROM node:22-alpine
+
+# psql client para ejecutar los archivos SQL
+RUN apk add --no-cache postgresql-client
+
+WORKDIR /app
+
+# Dependencias de Node (pg + ts-node para docker-seed.ts)
+COPY database/package-init.json ./package.json
+RUN npm install
+
+# tsconfig mínimo para ts-node
+COPY database/tsconfig-init.json ./tsconfig.json
+
+# Script de importación de datos
+COPY database/docker-seed.ts ./docker-seed.ts
+
+# Scripts SQL de los pasos 2–5
+COPY database/sql/02_topology.sql     /sql/02_topology.sql
+COPY database/sql/03_restrictions.sql  /sql/03_restrictions.sql
+COPY database/sql/04_backend_views.sql /sql/04_backend_views.sql
+COPY database/sql/05_search.sql        /sql/05_search.sql
+
+# Datos GeoJSON
+COPY database/data /data
+
+# Script orquestador
+COPY database/docker-init.sh /docker-init.sh
+# Elimina \r (CRLF de Windows) y da permisos de ejecucion
+RUN sed -i 's/\r//' /docker-init.sh && chmod +x /docker-init.sh
+
+CMD ["/docker-init.sh"]

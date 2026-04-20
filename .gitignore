@@ -6,8 +6,16 @@ __pycache__/
 node_modules/
 dist/
 .env
+.env.local
 
 cache/
+
+# IDE
+.idea/
+
+# Next.js build output
+.next/
+safetruck-next/.next/
 
 # datasets pesados
 database/data/**/*.geojson
