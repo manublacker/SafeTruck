@@ -7,6 +7,7 @@
 # Secrets requeridos (los mismos que deploy-database.yml):
 #   AZURE_CREDENTIALS    ← JSON del service principal
 #   GHCR_PAT             ← GitHub PAT con write:packages
+#   JWT_SECRET           ← Secret para firmar tokens JWT
 #
 # Variables requeridas:
 #   AZURE_RESOURCE_GROUP ← safetruck-rg
@@ -77,6 +78,7 @@ jobs:
             --name "${{ vars.BACKEND_APP_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "ghcr.io/${{ github.repository_owner }}/safetruck-backend:${{ github.sha }}" \
+            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
             --output none
 
       - name: Verify deployment
