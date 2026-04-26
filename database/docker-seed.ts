@@ -24,13 +24,15 @@ import fs   from "fs";
 import path from "path";
 import { Client } from "pg";
 
-const DB_CONFIG = {
-  host:     process.env.PGHOST     ?? "db",
-  port:     Number(process.env.PGPORT ?? 5432),
-  database: process.env.PGDATABASE ?? "safetruck",
-  user:     process.env.PGUSER     ?? "postgres",
-  password: process.env.PGPASSWORD ?? "postgres",
-};
+const DB_CONFIG = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+  : {
+      host:     process.env.PGHOST     ?? "db",
+      port:     Number(process.env.PGPORT ?? 5432),
+      database: process.env.PGDATABASE ?? "safetruck",
+      user:     process.env.PGUSER     ?? "postgres",
+      password: process.env.PGPASSWORD ?? "postgres",
+    };
 
 // En el contenedor los datos están en /data (copiados por Dockerfile.init)
 const DATA_DIR = process.env.DATA_DIR ?? path.join(__dirname, "data");
@@ -81,12 +83,52 @@ function toTextOrNull(val: unknown): string | null {
   return String(val);
 }
 
+// ── Helpers de batch ─────────────────────────────────────────
+
+const BATCH_SIZE = 500;
+
+async function insertarBatchRedVial(client: Client, rows: any[][]) {
+  if (rows.length === 0) return;
+  await client.query(
+    `INSERT INTO red_vial (dataset_origen,feature_id,codigo,nombre,nombre_alterno,tipo_via,longitud_m,sentido,jerarquia_vial,jurisdiccion,metadata,geom)
+     SELECT t.c1,t.c2,t.c3,t.c4,t.c5,t.c6,t.c7::float8,t.c8,t.c9,t.c10,t.c11::jsonb,ST_GeomFromText(t.c12,4326)
+     FROM unnest($1::text[],$2::text[],$3::text[],$4::text[],$5::text[],$6::text[],$7::text[],$8::text[],$9::text[],$10::text[],$11::text[],$12::text[])
+     AS t(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12)
+     ON CONFLICT (dataset_origen,feature_id) DO NOTHING`,
+    Array.from({ length: 12 }, (_, i) => rows.map(r => r[i] !== null && r[i] !== undefined ? String(r[i]) : null))
+  );
+}
+
+async function insertarBatchRutasNacionales(client: Client, rows: any[][]) {
+  if (rows.length === 0) return;
+  await client.query(
+    `INSERT INTO red_vial (dataset_origen,feature_id,nombre,tipo_via,sentido,jerarquia_vial,jurisdiccion,metadata,geom)
+     SELECT t.c1,t.c2,t.c3,t.c4,t.c5,t.c6,t.c7,t.c8::jsonb,ST_GeomFromText(t.c9,4326)
+     FROM unnest($1::text[],$2::text[],$3::text[],$4::text[],$5::text[],$6::text[],$7::text[],$8::text[],$9::text[])
+     AS t(c1,c2,c3,c4,c5,c6,c7,c8,c9)
+     ON CONFLICT (dataset_origen,feature_id) DO NOTHING`,
+    Array.from({ length: 9 }, (_, i) => rows.map(r => r[i] !== null && r[i] !== undefined ? String(r[i]) : null))
+  );
+}
+
+async function insertarBatchRedCamiones(client: Client, rows: any[][]) {
+  if (rows.length === 0) return;
+  await client.query(
+    `INSERT INTO red_camiones (dataset_origen,nombre,desde_calle,hasta_calle,descripcion,metadata,geom)
+     SELECT t.c1,t.c2,t.c3,t.c4,t.c5,t.c6::jsonb,ST_GeomFromText(t.c7,4326)
+     FROM unnest($1::text[],$2::text[],$3::text[],$4::text[],$5::text[],$6::text[],$7::text[])
+     AS t(c1,c2,c3,c4,c5,c6,c7)`,
+    Array.from({ length: 7 }, (_, i) => rows.map(r => r[i] !== null && r[i] !== undefined ? String(r[i]) : null))
+  );
+}
+
 // ── Importaciones ────────────────────────────────────────────
 
 async function importarRedVialCABA(client: Client) {
   console.log("\n[1/3] Importando red vial de CABA...");
   const geojson = leerGeoJSON(ARCHIVOS.redVialCABA);
-  let insertados = 0, omitidos = 0;
+  const rows: any[][] = [];
+  let omitidos = 0;
 
   for (const feature of geojson.features) {
     const p = feature.properties;
@@ -95,25 +137,25 @@ async function importarRedVialCABA(client: Client) {
     if (!featureId || !nombre || !feature.geometry) { omitidos++; continue; }
 
     for (const wkt of geometriaALineStrings(feature.geometry)) {
-      await client.query(
-        `INSERT INTO red_vial (dataset_origen,feature_id,codigo,nombre,nombre_alterno,tipo_via,longitud_m,sentido,jerarquia_vial,jurisdiccion,metadata,geom)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,ST_GeomFromText($12,4326))
-         ON CONFLICT (dataset_origen,feature_id) DO NOTHING`,
-        ["caba", featureId, toTextOrNull(p["codigo"]), nombre, toTextOrNull(p["nom_mapa"]),
-         toTextOrNull(p["tipo_c"]), typeof p["long"] === "number" ? p["long"] : null,
-         normalizarSentido(p["sentido"]), toTextOrNull(p["red_jerarq"]), "CABA",
-         JSON.stringify({ barrio: p["barrio"], comuna: p["comuna"] }), wkt]
-      );
-      insertados++;
+      rows.push(["caba", featureId, toTextOrNull(p["codigo"]), nombre, toTextOrNull(p["nom_mapa"]),
+        toTextOrNull(p["tipo_c"]), typeof p["long"] === "number" ? p["long"] : null,
+        normalizarSentido(p["sentido"]), toTextOrNull(p["red_jerarq"]), "CABA",
+        JSON.stringify({ barrio: p["barrio"], comuna: p["comuna"] }), wkt]);
     }
   }
-  console.log(`  ✓ ${insertados} filas insertadas, ${omitidos} omitidas.`);
+
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    await insertarBatchRedVial(client, rows.slice(i, i + BATCH_SIZE));
+    process.stdout.write(`\r  ... ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length}`);
+  }
+  console.log(`\n  ✓ ${rows.length} filas insertadas, ${omitidos} omitidas.`);
 }
 
 async function importarRutasNacionales(client: Client) {
   console.log("\n[2/3] Importando rutas nacionales...");
   const geojson = leerGeoJSON(ARCHIVOS.rutasNacionales);
-  let insertados = 0, omitidos = 0;
+  const rows: any[][] = [];
+  let omitidos = 0;
 
   for (const feature of geojson.features) {
     const p = feature.properties;
@@ -122,28 +164,28 @@ async function importarRutasNacionales(client: Client) {
     if (!featureId || !feature.geometry) { omitidos++; continue; }
 
     for (const wkt of geometriaALineStrings(feature.geometry)) {
-      await client.query(
-        `INSERT INTO red_vial (dataset_origen,feature_id,nombre,tipo_via,sentido,jerarquia_vial,jurisdiccion,metadata,geom)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,ST_GeomFromText($9,4326))
-         ON CONFLICT (dataset_origen,feature_id) DO NOTHING`,
-        ["rn", featureId, nombre, "RUTA", "DOBLE MANO", "TRONCAL", "Nacional", JSON.stringify(p), wkt]
-      );
-      insertados++;
+      rows.push(["rn", featureId, nombre, "RUTA", "DOBLE MANO", "TRONCAL", "Nacional", JSON.stringify(p), wkt]);
     }
   }
-  console.log(`  ✓ ${insertados} filas insertadas, ${omitidos} omitidas.`);
+
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    await insertarBatchRutasNacionales(client, rows.slice(i, i + BATCH_SIZE));
+    process.stdout.write(`\r  ... ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length}`);
+  }
+  console.log(`\n  ✓ ${rows.length} filas insertadas, ${omitidos} omitidas.`);
 }
 
 async function importarRedCamiones(client: Client) {
   console.log("\n[3/3] Importando red de tránsito pesado de CABA...");
   const geojson = leerGeoJSON(ARCHIVOS.redCamiones);
-  let insertados = 0, omitidos = 0;
+  const rows: any[][] = [];
+  let omitidos = 0;
 
   for (const feature of geojson.features) {
     const p = feature.properties;
     if (!feature.geometry) { omitidos++; continue; }
 
-    const nombre     = toTextOrNull(p["name"]) ?? "SIN NOMBRE";
+    const nombre      = toTextOrNull(p["name"]) ?? "SIN NOMBRE";
     const descripcion = toTextOrNull(p["description"]);
     let desdeCalle: string | null = null, hastaCalle: string | null = null;
 
@@ -153,16 +195,15 @@ async function importarRedCamiones(client: Client) {
     }
 
     for (const wkt of geometriaALineStrings(feature.geometry)) {
-      await client.query(
-        `INSERT INTO red_camiones (dataset_origen,nombre,desde_calle,hasta_calle,descripcion,metadata,geom)
-         VALUES ($1,$2,$3,$4,$5,$6,ST_GeomFromText($7,4326))`,
-        ["caba", nombre, desdeCalle, hastaCalle, descripcion,
-         JSON.stringify({ stroke: p["stroke"] }), wkt]
-      );
-      insertados++;
+      rows.push(["caba", nombre, desdeCalle, hastaCalle, descripcion, JSON.stringify({ stroke: p["stroke"] }), wkt]);
     }
   }
-  console.log(`  ✓ ${insertados} filas insertadas, ${omitidos} omitidas.`);
+
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    await insertarBatchRedCamiones(client, rows.slice(i, i + BATCH_SIZE));
+    process.stdout.write(`\r  ... ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length}`);
+  }
+  console.log(`\n  ✓ ${rows.length} filas insertadas, ${omitidos} omitidas.`);
 }
 
 // ── Main ─────────────────────────────────────────────────────

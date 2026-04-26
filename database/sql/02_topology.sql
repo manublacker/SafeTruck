@@ -34,12 +34,12 @@ WHERE geom IS NOT NULL;
 -- Paso 2: Extraer vértices únicos (intersecciones) y cargar en nodos
 -- -----------------------------------------------------------------------------
 INSERT INTO nodos (id, geom)
-SELECT
-    id,
-    ST_SetSRID(geom, 4326)
-FROM pgr_extractVertices(
-    'SELECT id::BIGINT, geom FROM aristas WHERE geom IS NOT NULL'
-);
+WITH endpoints AS (
+    SELECT ST_SetSRID(ST_StartPoint(geom), 4326) AS geom FROM aristas WHERE geom IS NOT NULL
+    UNION
+    SELECT ST_SetSRID(ST_EndPoint(geom), 4326) AS geom FROM aristas WHERE geom IS NOT NULL
+)
+SELECT ROW_NUMBER() OVER () AS id, geom FROM endpoints;
 
 -- Sincronizar la secuencia del BIGSERIAL con los IDs insertados
 SELECT setval(

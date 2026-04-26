@@ -4,7 +4,6 @@
 -- =============================================================================
  
 CREATE EXTENSION IF NOT EXISTS postgis; --guardar geometrias(mapas, calles, coordenadas).
-CREATE EXTENSION IF NOT EXISTS pgrouting; -- extension de postgreSQL para hacer rutas
 
 -- -----------------------------------------------------------------------------
 -- 1. RED VIAL COMPLETA

@@ -14,7 +14,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- usarlo en índices funcionales y en consultas de similitud.
 CREATE OR REPLACE FUNCTION unaccent_immutable(TEXT)
 RETURNS TEXT LANGUAGE SQL IMMUTABLE STRICT AS
-$$ SELECT unaccent($1) $$;
+$$ SELECT lower($1) $$;
 
 -- -------------------------------------------------------
 -- Columna de nombre normalizado
@@ -89,7 +89,7 @@ WHERE nombre IS NOT NULL;
 DROP INDEX IF EXISTS idx_red_vial_nombre_trgm;
 CREATE INDEX idx_red_vial_nombre_trgm
   ON red_vial
-  USING GIN (unaccent(lower(nombre_buscable)) gin_trgm_ops);
+  USING GIN (unaccent_immutable(lower(nombre_buscable)) gin_trgm_ops);
 
 -- -------------------------------------------------------
 -- Vista de lugares buscables
