@@ -1,0 +1,3 @@
+[submodule "safesruck-frontend-dep"]
+	path = safesruck-frontend-dep
+	url = https://github.com/SergioSLO/safesruck-frontend-dep.git
