@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,17 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { login as apiLogin } from '@/services/authApi';
 import { useAuth } from '@/contexts/AuthContext';
+import { Palette, type ThemeTokens } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function LoginScreen() {
+  const { tokens } = useTheme();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,20 +51,27 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brand}>
-          <Text style={styles.brandName}>SafeTruck</Text>
-          <Text style={styles.brandTagline}>Rutas para camiones</Text>
+          <Image
+            source={require('@/assets/images/safetruck-logo.png')}
+            style={styles.logoImg}
+            resizeMode="contain"
+          />
+          <View>
+            <Text style={styles.eyebrow}>LOGÍSTICA AMBA</Text>
+            <Text style={styles.brandName}>SafeTruck</Text>
+          </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.title}>Iniciar sesión</Text>
+        <Text style={styles.subtitle}>Rutas para flotas de camiones.</Text>
 
+        <View style={styles.form}>
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
             value={email}
             onChangeText={setEmail}
             placeholder="juan@empresa.com"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={tokens.textMuted}
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
@@ -71,7 +83,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="••••••"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={tokens.textMuted}
             secureTextEntry
             autoComplete="current-password"
           />
@@ -79,15 +91,14 @@ export default function LoginScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[styles.cta, loading && styles.ctaDisabled]}
             onPress={handleLogin}
             disabled={loading}
+            activeOpacity={0.85}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Ingresar</Text>
-            )}
+            {loading
+              ? <ActivityIndicator color={tokens.textOnCta} />
+              : <Text style={styles.ctaText}>Ingresar</Text>}
           </TouchableOpacity>
 
           <Link href="/(auth)/register" asChild>
@@ -103,94 +114,104 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(tokens: ThemeTokens) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: tokens.surface,
   },
   scroll: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: tokens.spaceXl,
+    paddingVertical: 48,
   },
   brand: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    gap: 14,
+    marginBottom: 8,
+  },
+  logoImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: tokens.letterEyebrow,
+    color: tokens.textSecond,
+    marginBottom: 2,
   },
   brandName: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1a73e8',
+    fontSize: 28,
+    fontWeight: '800',
+    color: tokens.textPrimary,
     letterSpacing: -0.5,
   },
-  brandTagline: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
+  subtitle: {
+    fontSize: tokens.fontSizeBody,
+    color: tokens.textSecond,
+    marginBottom: 32,
+    lineHeight: 22,
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 20,
+  form: {
+    width: '100%',
   },
   label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#374151',
+    fontSize: tokens.fontSizeSmall,
+    fontWeight: '700',
+    color: tokens.textPrimary,
     marginBottom: 6,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#111827',
-    backgroundColor: '#f9fafb',
-    marginBottom: 16,
+    borderColor: tokens.border,
+    borderRadius: tokens.radiusSm,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: tokens.fontSizeBody,
+    color: tokens.textPrimary,
+    backgroundColor: tokens.surface,
+    marginBottom: tokens.spaceLg,
   },
   error: {
-    color: '#dc2626',
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: '#1a73e8',
-    borderRadius: 8,
-    paddingVertical: 13,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 15,
+    color: tokens.danger,
+    fontSize: tokens.fontSizeSmall,
     fontWeight: '600',
+    marginBottom: tokens.spaceMd,
+    backgroundColor: tokens.dangerBg,
+    padding: 10,
+    borderRadius: tokens.radiusSm,
+  },
+  cta: {
+    backgroundColor: tokens.cta,
+    borderRadius: tokens.ctaRadius,
+    minHeight: tokens.ctaHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: tokens.spaceXs,
+  },
+  ctaDisabled: {
+    backgroundColor: tokens.textMuted,
+  },
+  ctaText: {
+    color: tokens.textOnCta,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   switchLink: {
-    marginTop: 16,
+    marginTop: tokens.spaceLg,
     alignItems: 'center',
   },
   switchText: {
-    color: '#6b7280',
-    fontSize: 14,
+    color: tokens.textSecond,
+    fontSize: tokens.fontSizeSmall,
   },
   switchTextBold: {
-    color: '#1a73e8',
-    fontWeight: '600',
+    color: tokens.textPrimary,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
-});
+}); }
