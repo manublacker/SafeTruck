@@ -1,50 +1,55 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AuthUser } from '@/types/auth';
-import { setToken, removeToken, getToken } from '@/services/api';
-
-const USER_KEY = 'safetruck_user';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import type { AuthUser } from "@/types/auth";
+import { supabase } from "@/lib/supabase";
+import { setToken, removeToken } from "@/services/api";
 
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
   login: (token: string, user: AuthUser) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setTokenState] = useState<string | null>(null);
+  const [user, setUser]           = useState<AuthUser | null>(null);
+  const [token, setTokenState]    = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function hydrate() {
-      try {
-        const raw = await AsyncStorage.getItem(USER_KEY);
-        if (raw) setUser(JSON.parse(raw) as AuthUser);
-        setTokenState(getToken());
-      } catch {
-        // ignore
-      } finally {
-        setIsLoading(false);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setToken(session.access_token);
+        setTokenState(session.access_token);
       }
-    }
-    hydrate();
+      setIsLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setToken(session.access_token);
+        setTokenState(session.access_token);
+      } else {
+        removeToken();
+        setTokenState(null);
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = useCallback((newToken: string, newUser: AuthUser) => {
     setToken(newToken);
-    AsyncStorage.setItem(USER_KEY, JSON.stringify(newUser));
     setTokenState(newToken);
     setUser(newUser);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     removeToken();
-    AsyncStorage.removeItem(USER_KEY);
     setTokenState(null);
     setUser(null);
   }, []);
@@ -58,6 +63,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');
+  if (!ctx) throw new Error("useAuth debe usarse dentro de AuthProvider");
   return ctx;
 }

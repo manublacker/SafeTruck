@@ -78,7 +78,7 @@ jobs:
             --name "${{ vars.BACKEND_APP_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "ghcr.io/${{ github.repository_owner }}/safetruck-backend:${{ github.sha }}" \
-            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}" "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             --output none
 
       - name: Verify deployment
