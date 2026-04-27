@@ -282,7 +282,10 @@ export default function MapScreen() {
       const response = await calculateRoute(payload);
       setRouteResponse(response);
       if (response.found && response.path.length > 0) {
-        const coords = response.path.map((n) => ({ latitude: n.lat, longitude: n.lon }));
+        const coords = (response.snappedPoints && response.snappedPoints.length > 0
+          ? response.snappedPoints
+          : response.path.flatMap((n: any) => n.geometry?.length ? n.geometry : [{ lat: n.lat, lon: n.lon }])
+        ).map((p: any) => ({ latitude: p.lat, longitude: p.lon }));
         setRouteCoords(coords);
         mapRef.current?.fitToCoordinates(coords, {
           edgePadding: { top: 120, right: 60, bottom: (SHEET_HEIGHT - SNAP_MID) + 40, left: 60 },
