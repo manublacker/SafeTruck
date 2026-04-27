@@ -189,6 +189,9 @@ export default function MapScreen() {
   const [routeResponse, setRouteResponse] = useState<RouteResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [userHeading, setUserHeading] = useState(0);
+  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
 
   const originTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const destTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -208,6 +211,36 @@ export default function MapScreen() {
       } catch { /* sin GPS, queda editable */ }
     })();
   }, []);
+  
+  useEffect(() => {
+    if (!isNavigating) return;
+  
+    const subscription = Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000,
+        distanceInterval: 5,
+      },
+      (loc) => {
+        const { latitude, longitude, heading } = loc.coords;
+        setUserLocation({ latitude, longitude });
+        setUserHeading(heading ?? 0);
+  
+        // Actualizo la cámara para seguir al usuario
+        mapRef.current?.animateCamera({
+          center: { latitude, longitude },
+          heading: heading ?? 0,
+          pitch: 60,
+          zoom: 18,
+          altitude: 500,
+        }, { duration: 500 });
+      }
+    );
+  
+    return () => {
+      subscription.then(s => s.remove());
+    };
+  }, [isNavigating]);
 
   function handleLocInput(
     setField: React.Dispatch<React.SetStateAction<LocField>>,
@@ -485,20 +518,33 @@ export default function MapScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.startBtn, isLoading && styles.startBtnDisabled]}
-              onPress={handleSearch}
-              disabled={isLoading}
-              activeOpacity={0.85}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={Palette.white} />
-              ) : (
-                <>
-                  <Ionicons name="arrow-up" size={16} color={Palette.white} />
-                  <Text style={styles.startBtnText}>Iniciar</Text>
-                </>
-              )}
-            </TouchableOpacity>
+  style={[styles.startBtn, isLoading && styles.startBtnDisabled]}
+  onPress={isNavigating ? () => {
+    setIsNavigating(false);
+    mapRef.current?.fitToCoordinates(routeCoords, {
+      edgePadding: { top: 120, right: 60, bottom: (SHEET_HEIGHT - SNAP_MID) + 40, left: 60 },
+      animated: true,
+    });
+  } : async () => {
+    if (routeResponse?.found) {
+      setIsNavigating(true);
+      snapTo(SNAP_PEEK);
+    } else {
+      await handleSearch();
+    }
+  }}
+  disabled={isLoading}
+  activeOpacity={0.85}
+>
+  {isLoading ? (
+    <ActivityIndicator color={Palette.white} />
+  ) : (
+    <>
+      <Ionicons name={isNavigating ? "stop" : "arrow-up"} size={16} color={Palette.white} />
+      <Text style={styles.startBtnText}>{isNavigating ? "Detener" : "Iniciar"}</Text>
+    </>
+  )}
+</TouchableOpacity>
           </View>
 
           {/* Warnings reales del backend */}
