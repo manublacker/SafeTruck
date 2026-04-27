@@ -2,19 +2,16 @@ export interface Coordinates {
   lat: number;
   lon: number;
 }
-
 export interface VehicleProfile {
   maxWeightKg: number;
   maxHeightM: number;
   maxWidthM: number;
   maxLengthM: number;
 }
-
 export interface RoutingOptions {
   avoidTolls: boolean;
   preferHighways: boolean;
 }
-
 export interface RouteRequest {
   originLabel: string;
   destinationLabel: string;
@@ -23,14 +20,13 @@ export interface RouteRequest {
   vehicle: VehicleProfile;
   routingOptions: RoutingOptions;
 }
-
 export interface RouteNode {
   nodeId: string;
   lat: number;
   lon: number;
   label: string;
+  geometry: Coordinates[];
 }
-
 export interface RouteResponse {
   found: boolean;
   routeId: string | null;
@@ -40,14 +36,13 @@ export interface RouteResponse {
   estimatedDurationMin: number;
   routeSummary: string;
   path: RouteNode[];
+  snappedPoints: Coordinates[];
   warnings: string[];
 }
-
 export interface HealthResponse {
   status: string;
   service: string;
 }
-
 export interface SearchResult {
   nombre: string;
   nombreOriginal: string;
