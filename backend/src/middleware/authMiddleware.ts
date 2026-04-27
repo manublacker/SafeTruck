@@ -1,20 +1,12 @@
-/*******************************************************
- * authMiddleware.ts
- *
- * Middleware JWT para SafeTruck.
- * Verifica el token Bearer en el header Authorization
- * y adjunta el payload decodificado a req.user.
- *******************************************************/
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { supabase } from "../supabaseClient";
 
 export interface AuthPayload {
-  id: number;
+  id: string;
   email: string;
-  full_name: string;
+  user_metadata: Record<string, unknown>;
 }
 
-// Extiende la interfaz Request de Express para incluir user
 declare global {
   namespace Express {
     interface Request {
@@ -23,11 +15,11 @@ declare global {
   }
 }
 
-export function authMiddleware(
+export async function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
   const header = req.headers.authorization;
 
   if (!header?.startsWith("Bearer ")) {
@@ -37,15 +29,18 @@ export function authMiddleware(
 
   const token = header.slice(7);
 
-  try {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      res.status(500).json({ error: "Configuración de servidor inválida." });
-      return;
-    }
-    req.user = jwt.verify(token, secret) as AuthPayload;
-    next();
-  } catch {
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
     res.status(401).json({ error: "Token inválido o expirado." });
+    return;
   }
+
+  req.user = {
+    id: user.id,
+    email: user.email!,
+    user_metadata: user.user_metadata ?? {},
+  };
+
+  next();
 }
