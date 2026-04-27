@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,9 +9,12 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { Theme, Palette } from '@/constants/theme';
+import { Palette, type ThemeTokens } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function ProfileScreen() {
+  const { tokens } = useTheme();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const { user, logout } = useAuth();
 
   function handleLogout() {
@@ -79,13 +83,13 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(tokens: ThemeTokens) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Theme.surfaceAlt,
+    backgroundColor: tokens.surfaceAlt,
   },
   content: {
-    padding: Theme.spaceXl,
+    padding: tokens.spaceXl,
     paddingTop: 60,
   },
   header: {
@@ -96,10 +100,10 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: Theme.brand,
+    backgroundColor: tokens.brand,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Theme.spaceMd,
+    marginBottom: tokens.spaceMd,
   },
   avatarText: {
     color: Palette.white,
@@ -109,17 +113,17 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 22,
     fontWeight: '800',
-    color: Theme.textPrimary,
+    color: tokens.textPrimary,
     marginBottom: 4,
     letterSpacing: -0.3,
   },
   email: {
     fontSize: 14,
-    color: Theme.textSecond,
+    color: tokens.textSecond,
   },
   company: {
     fontSize: 13,
-    color: Theme.textMuted,
+    color: tokens.textMuted,
     marginTop: 2,
   },
   section: {
@@ -128,23 +132,23 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: Theme.textSecond,
+    color: tokens.textSecond,
     letterSpacing: 1.4,
-    marginBottom: Theme.spaceMd,
+    marginBottom: tokens.spaceMd,
   },
   truckCard: {
-    backgroundColor: Theme.surface,
-    borderRadius: Theme.radiusMd,
-    padding: Theme.spaceLg,
+    backgroundColor: tokens.surface,
+    borderRadius: tokens.radiusMd,
+    padding: tokens.spaceLg,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: Theme.border,
+    borderColor: tokens.border,
   },
   truckName: {
     fontSize: 16,
     fontWeight: '700',
-    color: Theme.textPrimary,
-    marginBottom: Theme.spaceMd,
+    color: tokens.textPrimary,
+    marginBottom: tokens.spaceMd,
   },
   truckSpecs: {
     flexDirection: 'row',
@@ -157,32 +161,32 @@ const styles = StyleSheet.create({
   specValue: {
     fontSize: 15,
     fontWeight: '800',
-    color: Theme.textPrimary,
+    color: tokens.textPrimary,
     letterSpacing: -0.3,
   },
   specUnit: {
     fontSize: 11,
     fontWeight: '600',
-    color: Theme.textSecond,
+    color: tokens.textSecond,
   },
   specKey: {
     fontSize: 9,
-    color: Theme.textSecond,
+    color: tokens.textSecond,
     fontWeight: '700',
     letterSpacing: 1.2,
     marginTop: 4,
   },
   logoutButton: {
-    backgroundColor: Theme.dangerBg,
-    borderRadius: Theme.radiusMd,
+    backgroundColor: tokens.dangerBg,
+    borderRadius: tokens.radiusMd,
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(198, 40, 40, 0.2)',
   },
   logoutText: {
-    color: Theme.danger,
+    color: tokens.danger,
     fontSize: 15,
     fontWeight: '700',
   },
-});
+}); }

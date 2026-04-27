@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,17 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Link, router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { register as apiRegister } from '@/services/authApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { Theme, Palette } from '@/constants/theme';
+import { Palette, type ThemeTokens } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function RegisterScreen() {
+  const { tokens } = useTheme();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const { login } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -26,8 +29,18 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = useCallback(async () => {
-    if (!fullName || !email || !password) {
+    const name = fullName.trim();
+    const mail = email.trim();
+    if (!name || !mail || !password) {
       setError('Completá nombre, email y contraseña.');
+      return;
+    }
+    if (!/^[\p{L}][\p{L}\s'-]{1,}$/u.test(name)) {
+      setError('El nombre solo puede tener letras, espacios, apóstrofes o guiones.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) {
+      setError('Ingresá un email válido (ej: nombre@empresa.com).');
       return;
     }
     if (password.length < 6) {
@@ -59,9 +72,11 @@ export default function RegisterScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brand}>
-          <View style={styles.logoSquare}>
-            <Ionicons name="cube-outline" size={26} color={Palette.white} />
-          </View>
+          <Image
+            source={require('@/assets/images/safetruck-logo.png')}
+            style={styles.logoImg}
+            resizeMode="contain"
+          />
           <View>
             <Text style={styles.eyebrow}>LOGÍSTICA AMBA</Text>
             <Text style={styles.brandName}>SafeTruck</Text>
@@ -77,7 +92,7 @@ export default function RegisterScreen() {
             value={fullName}
             onChangeText={setFullName}
             placeholder="Juan Pérez"
-            placeholderTextColor={Theme.textMuted}
+            placeholderTextColor={tokens.textMuted}
             autoComplete="name"
           />
 
@@ -87,7 +102,7 @@ export default function RegisterScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder="juan@empresa.com"
-            placeholderTextColor={Theme.textMuted}
+            placeholderTextColor={tokens.textMuted}
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
@@ -99,7 +114,7 @@ export default function RegisterScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="Mínimo 6 caracteres"
-            placeholderTextColor={Theme.textMuted}
+            placeholderTextColor={tokens.textMuted}
             secureTextEntry
             autoComplete="new-password"
           />
@@ -112,7 +127,7 @@ export default function RegisterScreen() {
             value={company}
             onChangeText={setCompany}
             placeholder="Transportes SA"
-            placeholderTextColor={Theme.textMuted}
+            placeholderTextColor={tokens.textMuted}
           />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -124,7 +139,7 @@ export default function RegisterScreen() {
             activeOpacity={0.85}
           >
             {loading
-              ? <ActivityIndicator color={Theme.textOnCta} />
+              ? <ActivityIndicator color={tokens.textOnCta} />
               : <Text style={styles.ctaText}>Crear cuenta</Text>}
           </TouchableOpacity>
 
@@ -141,15 +156,15 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(tokens: ThemeTokens) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Theme.surface,
+    backgroundColor: tokens.surface,
   },
   scroll: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: Theme.spaceXl,
+    paddingHorizontal: tokens.spaceXl,
     paddingVertical: 48,
   },
   brand: {
@@ -158,30 +173,27 @@ const styles = StyleSheet.create({
     gap: 14,
     marginBottom: 8,
   },
-  logoSquare: {
-    width: 44,
-    height: 44,
-    borderRadius: Theme.radiusSm,
-    backgroundColor: Theme.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
   },
   eyebrow: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: Theme.letterEyebrow,
-    color: Theme.textSecond,
+    letterSpacing: tokens.letterEyebrow,
+    color: tokens.textSecond,
     marginBottom: 2,
   },
   brandName: {
     fontSize: 28,
     fontWeight: '800',
-    color: Theme.textPrimary,
+    color: tokens.textPrimary,
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: Theme.fontSizeBody,
-    color: Theme.textSecond,
+    fontSize: tokens.fontSizeBody,
+    color: tokens.textSecond,
     marginBottom: 28,
     lineHeight: 22,
   },
@@ -189,63 +201,63 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    fontSize: Theme.fontSizeSmall,
+    fontSize: tokens.fontSizeSmall,
     fontWeight: '700',
-    color: Theme.textPrimary,
+    color: tokens.textPrimary,
     marginBottom: 6,
   },
   optional: {
     fontWeight: '400',
-    color: Theme.textMuted,
+    color: tokens.textMuted,
   },
   input: {
     borderWidth: 1,
-    borderColor: Theme.border,
-    borderRadius: Theme.radiusSm,
+    borderColor: tokens.border,
+    borderRadius: tokens.radiusSm,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    fontSize: Theme.fontSizeBody,
-    color: Theme.textPrimary,
-    backgroundColor: Theme.surface,
-    marginBottom: Theme.spaceLg,
+    fontSize: tokens.fontSizeBody,
+    color: tokens.textPrimary,
+    backgroundColor: tokens.surface,
+    marginBottom: tokens.spaceLg,
   },
   error: {
-    color: Theme.danger,
-    fontSize: Theme.fontSizeSmall,
+    color: tokens.danger,
+    fontSize: tokens.fontSizeSmall,
     fontWeight: '600',
-    marginBottom: Theme.spaceMd,
-    backgroundColor: Theme.dangerBg,
+    marginBottom: tokens.spaceMd,
+    backgroundColor: tokens.dangerBg,
     padding: 10,
-    borderRadius: Theme.radiusSm,
+    borderRadius: tokens.radiusSm,
   },
   cta: {
-    backgroundColor: Theme.cta,
-    borderRadius: Theme.ctaRadius,
-    minHeight: Theme.ctaHeight,
+    backgroundColor: tokens.cta,
+    borderRadius: tokens.ctaRadius,
+    minHeight: tokens.ctaHeight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Theme.spaceXs,
+    marginTop: tokens.spaceXs,
   },
   ctaDisabled: {
-    backgroundColor: Theme.textMuted,
+    backgroundColor: tokens.textMuted,
   },
   ctaText: {
-    color: Theme.textOnCta,
+    color: tokens.textOnCta,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
   switchLink: {
-    marginTop: Theme.spaceLg,
+    marginTop: tokens.spaceLg,
     alignItems: 'center',
   },
   switchText: {
-    color: Theme.textSecond,
-    fontSize: Theme.fontSizeSmall,
+    color: tokens.textSecond,
+    fontSize: tokens.fontSizeSmall,
   },
   switchTextBold: {
-    color: Theme.textPrimary,
+    color: tokens.textPrimary,
     fontWeight: '700',
     textDecorationLine: 'underline',
   },
-});
+}); }

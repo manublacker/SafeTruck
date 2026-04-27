@@ -15,6 +15,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  PanResponder,
 } from 'react-native';
 import MapView, { Marker, Polyline, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -22,11 +23,15 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { calculateRoute } from '@/services/api';
 import { searchLocations, geocodeLocation, type GeoSuggestion } from '@/services/geocoding';
 import type { RouteRequest, RouteResponse, RouteNode } from '@/types/route';
-import { Theme, Palette } from '@/constants/theme';
+import { Palette, type ThemeTokens } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SHEET_FULL = SCREEN_HEIGHT * 0.58;
-const SHEET_PEEK = 240;
+const SHEET_HEIGHT = SCREEN_HEIGHT;
+// translateY del sheet (0 = pegado arriba). Tope superior ≈ 25% libre arriba (mapa visible + pill camión).
+const SNAP_FULL  = SCREEN_HEIGHT * 0.25;
+const SNAP_MID   = SCREEN_HEIGHT * 0.55;
+const SNAP_PEEK  = SCREEN_HEIGHT - 110;
 
 const BA_REGION: Region = {
   latitude: -34.6037,
@@ -115,11 +120,66 @@ const defaultVehicle: VehicleConfig = {
 };
 
 export default function MapScreen() {
+  const { tokens, isDark, toggle } = useTheme();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const mapRef = useRef<MapView>(null);
-  const sheetY = useRef(new Animated.Value(SHEET_FULL - SHEET_PEEK)).current;
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const sheetY = useRef(new Animated.Value(SNAP_PEEK)).current;
+  const lastY = useRef(SNAP_PEEK);
   const [vehicleOpen, setVehicleOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('resumen');
+
+  function snapTo(target: number) {
+    Animated.spring(sheetY, {
+      toValue: target,
+      useNativeDriver: true,
+      tension: 90,
+      friction: 14,
+    }).start(() => { lastY.current = target; });
+    lastY.current = target;
+  }
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+        onPanResponderGrant: () => {
+          sheetY.stopAnimation((v) => { lastY.current = v; });
+        },
+        onPanResponderMove: (_, g) => {
+          const next = Math.max(SNAP_FULL, Math.min(SNAP_PEEK, lastY.current + g.dy));
+          sheetY.setValue(next);
+        },
+        onPanResponderRelease: (_, g) => {
+          const current = Math.max(SNAP_FULL, Math.min(SNAP_PEEK, lastY.current + g.dy));
+          const v = g.vy;
+          let target = SNAP_PEEK;
+          if (v < -0.5)      target = current < SNAP_MID ? SNAP_FULL : SNAP_MID;
+          else if (v > 0.5)  target = current > SNAP_MID ? SNAP_PEEK : SNAP_MID;
+          else {
+            const opts = [SNAP_FULL, SNAP_MID, SNAP_PEEK];
+            target = opts.reduce((a, b) => Math.abs(b - current) < Math.abs(a - current) ? b : a);
+          }
+          snapTo(target);
+        },
+      }),
+    [sheetY],
+  );
+
+  function handleMic() {
+    Alert.alert(
+      'Dictado por voz',
+      Platform.OS === 'ios'
+        ? 'Tocá el campo de búsqueda y luego el ícono de micrófono en el teclado para dictar.'
+        : 'Mantené presionado el ícono de micrófono en el teclado (Gboard / SwiftKey) para dictar.',
+    );
+  }
+
+  const fabOpacity = sheetY.interpolate({
+    inputRange: [SNAP_MID, (SNAP_MID + SNAP_PEEK) / 2, SNAP_PEEK],
+    outputRange: [0, 1, 1],
+    extrapolate: 'clamp',
+  });
 
   const [origin, setOrigin] = useState<LocField>(initLoc('Mi ubicación'));
   const [dest, setDest] = useState<LocField>(initLoc());
@@ -148,16 +208,6 @@ export default function MapScreen() {
       } catch { /* sin GPS, queda editable */ }
     })();
   }, []);
-
-  function openSheet() {
-    setSheetOpen(true);
-    Animated.spring(sheetY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
-  }
-
-  function closeSheet() {
-    setSheetOpen(false);
-    Animated.spring(sheetY, { toValue: SHEET_FULL - SHEET_PEEK, useNativeDriver: true, tension: 80, friction: 12 }).start();
-  }
 
   function handleLocInput(
     setField: React.Dispatch<React.SetStateAction<LocField>>,
@@ -235,12 +285,12 @@ export default function MapScreen() {
         const coords = response.path.map((n) => ({ latitude: n.lat, longitude: n.lon }));
         setRouteCoords(coords);
         mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 120, right: 60, bottom: SHEET_FULL + 40, left: 60 },
+          edgePadding: { top: 120, right: 60, bottom: (SHEET_HEIGHT - SNAP_MID) + 40, left: 60 },
           animated: true,
         });
       }
       setTab('resumen');
-      openSheet();
+      snapTo(SNAP_MID);
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Error al calcular la ruta.');
     } finally {
@@ -256,7 +306,7 @@ export default function MapScreen() {
   const recenter = () => {
     if (routeCoords.length > 0) {
       mapRef.current?.fitToCoordinates(routeCoords, {
-        edgePadding: { top: 120, right: 60, bottom: SHEET_FULL + 40, left: 60 },
+        edgePadding: { top: 120, right: 60, bottom: (SHEET_HEIGHT - SNAP_MID) + 40, left: 60 },
         animated: true,
       });
     } else if (origin.selected) {
@@ -295,7 +345,7 @@ export default function MapScreen() {
         {routeCoords.length > 0 && (
           <Polyline
             coordinates={routeCoords}
-            strokeColor={Theme.brand}
+            strokeColor={tokens.brand}
             strokeWidth={6}
             lineCap="round"
             lineJoin="round"
@@ -303,7 +353,7 @@ export default function MapScreen() {
         )}
       </MapView>
 
-      {/* Top: pill camión activo + botón cuadrado */}
+      {/* Top: pill camión activo (única) */}
       <View style={styles.topRow} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.activeTruckPill}
@@ -320,37 +370,32 @@ export default function MapScreen() {
               <Text style={styles.activeTruckMeta}>  ·  {vehicle.weightT} t  ·  {vehicle.heightM} m</Text>
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color={Theme.textOnDark} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.truckSquare} activeOpacity={0.85} onPress={() => setVehicleOpen(true)}>
-          <MaterialCommunityIcons name="truck" size={22} color={Theme.brand} />
+          <Ionicons name="chevron-forward" size={16} color={tokens.textOnDark} />
         </TouchableOpacity>
       </View>
 
-      {/* FABs derechos */}
-      <View style={styles.fabColumn} pointerEvents="box-none">
-        <TouchableOpacity style={styles.fabLight}>
-          <MaterialCommunityIcons name="layers-outline" size={20} color={Theme.textPrimary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.fabLight}>
-          <Ionicons name="compass-outline" size={20} color={Theme.textPrimary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.fabDark} onPress={recenter}>
+      {/* Recentrar (único FAB) — se oculta cuando el sheet sube */}
+      <Animated.View
+        style={[styles.fabRecenter, { opacity: fabOpacity }]}
+        pointerEvents="box-none"
+      >
+        <TouchableOpacity onPress={recenter} activeOpacity={0.85} style={styles.fabRecenterBtn}>
           <MaterialCommunityIcons name="crosshairs-gps" size={20} color={Palette.white} />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Bottom sheet */}
       <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetY }] }]}>
-        <TouchableOpacity onPress={sheetOpen ? closeSheet : openSheet} style={styles.handleArea}>
+        <View style={styles.handleArea} {...panResponder.panHandlers}>
           <View style={styles.handle} />
-        </TouchableOpacity>
+        </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.sheetContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
         >
           {/* Origen */}
           <View style={styles.searchRow}>
@@ -359,13 +404,13 @@ export default function MapScreen() {
               style={styles.searchInput}
               value={origin.value}
               onChangeText={(v) => handleLocInput(setOrigin, originTimer, v)}
-              onFocus={() => setActiveField('origin')}
+              onFocus={() => { setActiveField('origin'); snapTo(SNAP_FULL); }}
               placeholder="Origen"
-              placeholderTextColor={Theme.textMuted}
+              placeholderTextColor={tokens.textMuted}
             />
             {origin.value.length > 0 && (
               <TouchableOpacity onPress={() => setOrigin(initLoc())}>
-                <Ionicons name="close-circle" size={18} color={Theme.textMuted} />
+                <Ionicons name="close-circle" size={18} color={tokens.textMuted} />
               </TouchableOpacity>
             )}
           </View>
@@ -377,13 +422,13 @@ export default function MapScreen() {
               style={styles.searchInput}
               value={dest.value}
               onChangeText={(v) => handleLocInput(setDest, destTimer, v)}
-              onFocus={() => setActiveField('dest')}
+              onFocus={() => { setActiveField('dest'); snapTo(SNAP_FULL); }}
               placeholder="Buscá una dirección o lugar"
-              placeholderTextColor={Theme.textMuted}
+              placeholderTextColor={tokens.textMuted}
               returnKeyType="search"
               onSubmitEditing={handleSearch}
             />
-            <TouchableOpacity style={styles.micBtn}>
+            <TouchableOpacity style={styles.micBtn} onPress={handleMic}>
               <Ionicons name="mic" size={16} color={Palette.white} />
             </TouchableOpacity>
           </View>
@@ -399,7 +444,7 @@ export default function MapScreen() {
                   style={styles.suggestItem}
                   onPress={() => pickLoc(activeField === 'origin' ? setOrigin : setDest, item)}
                 >
-                  <Ionicons name="location-outline" size={16} color={Theme.textSecond} />
+                  <Ionicons name="location-outline" size={16} color={tokens.textSecond} />
                   <Text style={styles.suggestText} numberOfLines={1}>{item.label}</Text>
                 </TouchableOpacity>
               )}
@@ -455,11 +500,11 @@ export default function MapScreen() {
 
           {/* Warnings reales del backend */}
           {routeResponse?.found && (routeResponse.warnings?.length ?? 0) > 0 && (
-            <View style={{ marginBottom: Theme.spaceLg }}>
+            <View style={{ marginBottom: tokens.spaceLg }}>
               {routeResponse.warnings.map((w, i) => (
                 <View key={i} style={styles.cardWarn}>
                   <View style={styles.cardIconWrapWarn}>
-                    <Ionicons name="warning" size={18} color={Theme.warning} />
+                    <Ionicons name="warning" size={18} color={tokens.warning} />
                   </View>
                   <Text style={[styles.cardTitle, { flex: 1 }]}>{w}</Text>
                 </View>
@@ -546,6 +591,8 @@ export default function MapScreen() {
           setVehicle(v);
           setVehicleOpen(false);
         }}
+        isDark={isDark}
+        onToggleTheme={toggle}
       />
     </View>
   );
@@ -556,9 +603,13 @@ interface VehicleModalProps {
   value: VehicleConfig;
   onClose: () => void;
   onSave: (v: VehicleConfig) => void;
+  isDark: boolean;
+  onToggleTheme: () => void;
 }
 
-function VehicleModal({ visible, value, onClose, onSave }: VehicleModalProps) {
+function VehicleModal({ visible, value, onClose, onSave, isDark, onToggleTheme }: VehicleModalProps) {
+  const { tokens } = useTheme();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const [draft, setDraft] = useState<VehicleConfig>(value);
 
   useEffect(() => { setDraft(value); }, [value, visible]);
@@ -580,13 +631,13 @@ function VehicleModal({ visible, value, onClose, onSave }: VehicleModalProps) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: Theme.spaceXl, gap: Theme.spaceLg }}>
-          <Field label="Patente" value={draft.plate} onChange={(v) => update('plate', v)} autoCapitalize="characters" />
+        <ScrollView contentContainerStyle={{ padding: tokens.spaceXl, gap: tokens.spaceLg }}>
+          <Field styles={styles} label="Patente" value={draft.plate} onChange={(v) => update('plate', v)} autoCapitalize="characters" />
           <View style={styles.grid}>
-            <Field label="Peso (t)" value={draft.weightT} onChange={(v) => update('weightT', v)} keyboard="numeric" half />
-            <Field label="Altura (m)" value={draft.heightM} onChange={(v) => update('heightM', v)} keyboard="numeric" half />
-            <Field label="Ancho (m)" value={draft.widthM} onChange={(v) => update('widthM', v)} keyboard="numeric" half />
-            <Field label="Largo (m)" value={draft.lengthM} onChange={(v) => update('lengthM', v)} keyboard="numeric" half />
+            <Field styles={styles} label="Peso (t)" value={draft.weightT} onChange={(v) => update('weightT', v)} keyboard="numeric" half />
+            <Field styles={styles} label="Altura (m)" value={draft.heightM} onChange={(v) => update('heightM', v)} keyboard="numeric" half />
+            <Field styles={styles} label="Ancho (m)" value={draft.widthM} onChange={(v) => update('widthM', v)} keyboard="numeric" half />
+            <Field styles={styles} label="Largo (m)" value={draft.lengthM} onChange={(v) => update('lengthM', v)} keyboard="numeric" half />
           </View>
 
           <View style={styles.switchRow}>
@@ -594,7 +645,7 @@ function VehicleModal({ visible, value, onClose, onSave }: VehicleModalProps) {
             <Switch
               value={draft.avoidTolls}
               onValueChange={(v) => update('avoidTolls', v)}
-              trackColor={{ true: Theme.brand, false: Palette.charcoal12 }}
+              trackColor={{ true: tokens.brand, false: tokens.border }}
               thumbColor={Palette.white}
             />
           </View>
@@ -603,7 +654,16 @@ function VehicleModal({ visible, value, onClose, onSave }: VehicleModalProps) {
             <Switch
               value={draft.preferHighways}
               onValueChange={(v) => update('preferHighways', v)}
-              trackColor={{ true: Theme.brand, false: Palette.charcoal12 }}
+              trackColor={{ true: tokens.brand, false: tokens.border }}
+              thumbColor={Palette.white}
+            />
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Modo noche</Text>
+            <Switch
+              value={isDark}
+              onValueChange={onToggleTheme}
+              trackColor={{ true: tokens.brand, false: tokens.border }}
               thumbColor={Palette.white}
             />
           </View>
@@ -614,6 +674,7 @@ function VehicleModal({ visible, value, onClose, onSave }: VehicleModalProps) {
 }
 
 interface FieldProps {
+  styles: Styles;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -621,7 +682,7 @@ interface FieldProps {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   half?: boolean;
 }
-function Field({ label, value, onChange, keyboard = 'default', autoCapitalize = 'sentences', half }: FieldProps) {
+function Field({ styles, label, value, onChange, keyboard = 'default', autoCapitalize = 'sentences', half }: FieldProps) {
   return (
     <View style={[styles.fieldWrap, half && { width: '47%' }]}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -636,24 +697,25 @@ function Field({ label, value, onChange, keyboard = 'default', autoCapitalize = 
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Theme.surfaceAlt },
+function makeStyles(tokens: ThemeTokens) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: tokens.surfaceAlt },
 
   truckMarker: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Theme.brand, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: tokens.brand, alignItems: 'center', justifyContent: 'center',
     borderWidth: 3, borderColor: Palette.white,
-    ...Theme.shadow.fab,
+    ...tokens.shadow.fab,
   },
 
   // Top row
   topRow: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 56 : 36,
-    left: Theme.spaceLg,
-    right: Theme.spaceLg,
+    left: tokens.spaceLg,
+    right: tokens.spaceLg,
     flexDirection: 'row',
-    gap: Theme.spaceSm,
+    gap: tokens.spaceSm,
     alignItems: 'center',
     zIndex: 10,
   },
@@ -661,134 +723,119 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Theme.surfaceDark,
-    borderRadius: Theme.radiusPill,
+    backgroundColor: tokens.surfaceDark,
+    borderRadius: tokens.radiusPill,
     paddingVertical: 8,
     paddingHorizontal: 8,
     paddingRight: 14,
-    ...Theme.shadow.fab,
+    ...tokens.shadow.fab,
   },
   truckBadge: {
     width: 36, height: 36, borderRadius: 10,
-    backgroundColor: Theme.brand, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: tokens.brand, alignItems: 'center', justifyContent: 'center',
   },
   activeTruckEyebrow: {
-    color: Theme.textMuted,
+    color: tokens.textMuted,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.4,
   },
   activeTruckLine: {
-    color: Theme.textOnDark,
+    color: tokens.textOnDark,
     fontSize: 13,
     marginTop: 1,
   },
   activeTruckPlate: { fontWeight: '800', letterSpacing: 0.3 },
-  activeTruckMeta: { fontWeight: '500', color: Theme.textMuted },
+  activeTruckMeta: { fontWeight: '500', color: tokens.textMuted },
 
-  truckSquare: {
-    width: 48, height: 48, borderRadius: 14,
-    backgroundColor: Palette.white,
-    alignItems: 'center', justifyContent: 'center',
-    ...Theme.shadow.fab,
-  },
-
-  // FABs
-  fabColumn: {
+  fabRecenter: {
     position: 'absolute',
-    right: Theme.spaceLg,
-    top: SCREEN_HEIGHT * 0.32,
-    gap: 10,
+    right: tokens.spaceLg,
+    bottom: (SHEET_HEIGHT - SNAP_PEEK) + 16,
     zIndex: 9,
   },
-  fabLight: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: Palette.white,
+  fabRecenterBtn: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: tokens.surfaceDark,
     alignItems: 'center', justifyContent: 'center',
-    ...Theme.shadow.fab,
-  },
-  fabDark: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: Theme.surfaceDark,
-    alignItems: 'center', justifyContent: 'center',
-    ...Theme.shadow.fab,
+    ...tokens.shadow.fab,
   },
 
   // Sheet
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    height: SHEET_FULL,
-    backgroundColor: Theme.surface,
-    borderTopLeftRadius: Theme.radiusXl,
-    borderTopRightRadius: Theme.radiusXl,
-    ...Theme.shadow.sheet,
+    height: SHEET_HEIGHT,
+    backgroundColor: tokens.surface,
+    borderTopLeftRadius: tokens.radiusXl,
+    borderTopRightRadius: tokens.radiusXl,
+    ...tokens.shadow.sheet,
   },
-  handleArea: { alignItems: 'center', paddingVertical: 10 },
-  handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: Theme.border },
-  sheetContent: { paddingHorizontal: Theme.spaceXl, paddingBottom: 32 },
+  handleArea: { alignItems: 'center', paddingVertical: 14 },
+  handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: tokens.border },
+  sheetContent: { paddingHorizontal: tokens.spaceXl, paddingBottom: 32 },
 
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Theme.surfaceAlt,
-    borderRadius: Theme.radiusPill,
+    backgroundColor: tokens.surfaceAlt,
+    borderRadius: tokens.radiusPill,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: Theme.spaceLg,
+    marginBottom: tokens.spaceLg,
   },
-  searchInput: { flex: 1, fontSize: 15, color: Theme.textPrimary, paddingVertical: 4 },
+  searchInput: { flex: 1, fontSize: 15, color: tokens.textPrimary, paddingVertical: 4 },
   dotOrigin: {
     width: 10, height: 10, borderRadius: 5,
-    backgroundColor: Theme.brand,
+    backgroundColor: tokens.brand,
   },
   dotDest: {
     width: 10, height: 10, borderRadius: 5,
-    borderWidth: 2, borderColor: Theme.brand, backgroundColor: 'transparent',
+    borderWidth: 2, borderColor: tokens.brand, backgroundColor: 'transparent',
   },
   micBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: Theme.brand,
+    backgroundColor: tokens.brand,
     alignItems: 'center', justifyContent: 'center',
   },
 
-  suggestList: { maxHeight: 220, marginTop: -8, marginBottom: Theme.spaceMd },
+  suggestList: { maxHeight: 220, marginTop: -8, marginBottom: tokens.spaceMd },
   suggestItem: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 10, paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Theme.border,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: tokens.border,
   },
-  suggestText: { fontSize: 14, color: Theme.textPrimary, flex: 1 },
+  suggestText: { fontSize: 14, color: tokens.textPrimary, flex: 1 },
 
   // Hero
   routeHero: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Theme.spaceMd,
-    marginBottom: Theme.spaceLg,
+    gap: tokens.spaceMd,
+    marginBottom: tokens.spaceLg,
   },
   routeEyebrow: {
-    color: Theme.brand,
+    color: tokens.brand,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.3,
     marginBottom: 6,
   },
-  routeEyebrowSoft: { color: Theme.textSecond, fontWeight: '700' },
-  routeBig: { color: Theme.textPrimary },
+  routeEyebrowSoft: { color: tokens.textSecond, fontWeight: '700' },
+  routeBig: { color: tokens.textPrimary },
   routeBigNum: { fontSize: 38, fontWeight: '800', letterSpacing: -1 },
-  routeBigUnit: { fontSize: 16, fontWeight: '600', color: Theme.textSecond },
-  routeBigSep: { fontSize: 16, color: Theme.textMuted },
+  routeBigUnit: { fontSize: 16, fontWeight: '600', color: tokens.textSecond },
+  routeBigSep: { fontSize: 16, color: tokens.textMuted },
   routeBigDist: { fontSize: 18, fontWeight: '700' },
-  routeSub: { fontSize: 13, color: Theme.textSecond, marginTop: 4 },
-  routeSubBold: { fontWeight: '800', color: Theme.textPrimary },
+  routeSub: { fontSize: 13, color: tokens.textSecond, marginTop: 4 },
+  routeSubBold: { fontWeight: '800', color: tokens.textPrimary },
 
   startBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: Theme.brand,
+    backgroundColor: tokens.brand,
     paddingVertical: 14, paddingHorizontal: 22,
-    borderRadius: Theme.ctaRadius,
-    ...Theme.shadow.fab,
+    borderRadius: tokens.ctaRadius,
+    ...tokens.shadow.fab,
   },
   startBtnDisabled: { opacity: 0.6 },
   startBtnText: { color: Palette.white, fontSize: 15, fontWeight: '800' },
@@ -796,92 +843,95 @@ const styles = StyleSheet.create({
   // Cards
   cardWarn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: Theme.warningSoft,
-    borderRadius: Theme.radiusMd,
+    backgroundColor: tokens.warningSoft,
+    borderRadius: tokens.radiusMd,
     padding: 14,
-    marginBottom: Theme.spaceLg,
+    marginBottom: tokens.spaceLg,
   },
   cardIconWrapWarn: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: Palette.white,
     alignItems: 'center', justifyContent: 'center',
   },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: Theme.textPrimary },
-  cardSub: { fontSize: 12, color: Theme.textSecond, marginTop: 2 },
+  cardTitle: { fontSize: 14, fontWeight: '800', color: tokens.textPrimary },
+  cardSub: { fontSize: 12, color: tokens.textSecond, marginTop: 2 },
 
   // Tabs
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: Theme.surfaceAlt,
-    borderRadius: Theme.radiusPill,
+    backgroundColor: tokens.surfaceAlt,
+    borderRadius: tokens.radiusPill,
     padding: 4,
-    marginTop: Theme.spaceSm,
-    marginBottom: Theme.spaceLg,
+    marginTop: tokens.spaceSm,
+    marginBottom: tokens.spaceLg,
   },
   tabBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: Theme.radiusPill,
+    borderRadius: tokens.radiusPill,
     alignItems: 'center',
   },
-  tabBtnActive: { backgroundColor: Palette.white, ...Theme.shadow.fab },
-  tabText: { fontSize: 13, fontWeight: '600', color: Theme.textSecond },
-  tabTextActive: { color: Theme.textPrimary, fontWeight: '800' },
-  tabBody: { fontSize: 13, color: Theme.textSecond, lineHeight: 19 },
+  tabBtnActive: { backgroundColor: Palette.white, ...tokens.shadow.fab },
+  tabText: { fontSize: 13, fontWeight: '600', color: tokens.textSecond },
+  tabTextActive: { color: tokens.textPrimary, fontWeight: '800' },
+  tabBody: { fontSize: 13, color: tokens.textSecond, lineHeight: 19 },
 
   // Steps
   stepList: { gap: 4 },
   stepItem: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: Theme.border,
+    borderBottomWidth: 1, borderBottomColor: tokens.border,
   },
   stepNumber: {
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: Theme.brand, alignItems: 'center', justifyContent: 'center', marginTop: 1,
+    backgroundColor: tokens.brand, alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
   stepNumberText: { color: Palette.white, fontSize: 12, fontWeight: '800' },
-  stepStreet: { fontSize: 14, color: Theme.textPrimary, fontWeight: '600' },
-  stepDist: { fontSize: 12, color: Theme.textSecond, marginTop: 2 },
+  stepStreet: { fontSize: 14, color: tokens.textPrimary, fontWeight: '600' },
+  stepDist: { fontSize: 12, color: tokens.textSecond, marginTop: 2 },
 
   // Restricciones
   restrRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: Theme.border,
+    borderBottomWidth: 1, borderBottomColor: tokens.border,
   },
   restrRowLast: { borderBottomWidth: 0 },
-  restrKey: { fontSize: 13, color: Theme.textSecond },
-  restrVal: { fontSize: 14, fontWeight: '700', color: Theme.textPrimary },
+  restrKey: { fontSize: 13, color: tokens.textSecond },
+  restrVal: { fontSize: 14, fontWeight: '700', color: tokens.textPrimary },
 
   // Modal
-  modalRoot: { flex: 1, backgroundColor: Theme.surfaceAlt },
+  modalRoot: { flex: 1, backgroundColor: tokens.surfaceAlt },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Theme.spaceXl, paddingTop: 16, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: Theme.border,
-    backgroundColor: Theme.surface,
+    paddingHorizontal: tokens.spaceXl, paddingTop: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: tokens.border,
+    backgroundColor: tokens.surface,
   },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: Theme.textPrimary },
-  modalCancel: { fontSize: 15, color: Theme.textSecond },
-  modalSave: { fontSize: 15, color: Theme.brand, fontWeight: '800' },
+  modalTitle: { fontSize: 16, fontWeight: '800', color: tokens.textPrimary },
+  modalCancel: { fontSize: 15, color: tokens.textSecond },
+  modalSave: { fontSize: 15, color: tokens.brand, fontWeight: '800' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   fieldWrap: {},
-  fieldLabel: { fontSize: 11, color: Theme.textSecond, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
+  fieldLabel: { fontSize: 11, color: tokens.textSecond, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
   fieldInput: {
-    backgroundColor: Theme.surface,
-    borderRadius: Theme.radiusMd,
+    backgroundColor: tokens.surface,
+    borderRadius: tokens.radiusMd,
     paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, color: Theme.textPrimary,
-    borderWidth: 1, borderColor: Theme.border,
+    fontSize: 15, color: tokens.textPrimary,
+    borderWidth: 1, borderColor: tokens.border,
   },
   switchRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: Theme.surface,
-    borderRadius: Theme.radiusMd,
+    backgroundColor: tokens.surface,
+    borderRadius: tokens.radiusMd,
     paddingHorizontal: 14, paddingVertical: 12,
-    borderWidth: 1, borderColor: Theme.border,
+    borderWidth: 1, borderColor: tokens.border,
   },
-  switchLabel: { fontSize: 14, color: Theme.textPrimary, fontWeight: '600' },
-});
+  switchLabel: { fontSize: 14, color: tokens.textPrimary, fontWeight: '600' },
+  });
+}
+
+type Styles = ReturnType<typeof makeStyles>;

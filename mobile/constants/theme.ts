@@ -24,8 +24,8 @@ export const Palette = {
   greenSoft:   'rgba(46, 125, 50, 0.10)',
 } as const;
 
-export const Theme = {
-  // Roles semánticos
+// Tokens semánticos por modo. La shape es idéntica entre light y dark.
+const lightSemantic = {
   brand:        Palette.orange,
   brandDk:      Palette.orangeDk,
   cta:          Palette.orange,
@@ -50,8 +50,36 @@ export const Theme = {
   successBg:    Palette.greenSoft,
   danger:       Palette.red,
   dangerBg:     Palette.redSoft,
+} as const;
 
-  // Geometría
+const darkSemantic = {
+  brand:        Palette.orange,
+  brandDk:      Palette.orangeDk,
+  cta:          Palette.orange,
+  ctaDark:      Palette.orangeDk,
+  surface:      '#1F1815',
+  surfaceAlt:   '#2A2320',
+  surfaceDeep:  '#352C28',
+  surfaceDark:  '#0F0B0A',
+  border:       'rgba(255, 255, 255, 0.10)',
+  borderSoft:   'rgba(255, 255, 255, 0.05)',
+  textPrimary:  '#F4EDE0',
+  textSecond:   '#C2B8AD',
+  textMuted:    '#7A6E63',
+  textOnCta:    Palette.white,
+  textOnBrand:  Palette.white,
+  textOnDark:   '#F4EDE0',
+  toll:         Palette.yellow,
+  tollSoft:     'rgba(240, 194, 74, 0.18)',
+  warning:      '#E07566',
+  warningSoft:  'rgba(196, 69, 54, 0.22)',
+  success:      Palette.green,
+  successBg:    Palette.greenSoft,
+  danger:       '#E07566',
+  dangerBg:     'rgba(196, 69, 54, 0.22)',
+} as const;
+
+const constants = {
   radiusSm:     10,
   radiusMd:     14,
   radiusLg:     18,
@@ -65,7 +93,6 @@ export const Theme = {
   ctaHeight:    52,
   ctaRadius:    14,
 
-  // Tipografía
   fontSizeCaption: 11,
   fontSizeSmall:   13,
   fontSizeBody:    15,
@@ -81,7 +108,15 @@ export const Theme = {
   },
 } as const;
 
-export type ThemeTokens = typeof Theme;
+type Semantic = { -readonly [K in keyof typeof lightSemantic]: string };
+type Constants = typeof constants;
+export type ThemeTokens = Semantic & Constants;
+
+export const LightTheme: ThemeTokens = { ...lightSemantic, ...constants };
+export const DarkTheme:  ThemeTokens = { ...darkSemantic,  ...constants };
+
+// Default export que mantiene el camino histórico (claro). Hooks devuelven el tema activo.
+export const Theme = LightTheme;
 
 // Compat con scaffold de Expo
 export const Colors = {

@@ -1,14 +1,13 @@
 import { useEffect } from 'react';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme as NavDark, DefaultTheme as NavLight, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ThemeProvider as AppThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { loadToken } from '@/services/api';
-import { Theme } from '@/constants/theme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -16,6 +15,7 @@ export const unstable_settings = {
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const { tokens } = useTheme();
   const segments = useSegments();
 
   useEffect(() => {
@@ -30,8 +30,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={Theme.brand} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: tokens.surface }}>
+        <ActivityIndicator size="large" color={tokens.brand} />
       </View>
     );
   }
@@ -40,18 +40,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 function RootLayoutInner() {
-  const colorScheme = useColorScheme();
+  const { isDark } = useTheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <NavThemeProvider value={isDark ? NavDark : NavLight}>
       <AuthGate>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         </Stack>
       </AuthGate>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+    </NavThemeProvider>
   );
 }
 
@@ -62,7 +62,9 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <RootLayoutInner />
+      <AppThemeProvider>
+        <RootLayoutInner />
+      </AppThemeProvider>
     </AuthProvider>
   );
 }
