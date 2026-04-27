@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { Link, router } from 'expo-router';
-import { login as apiLogin } from '@/services/authApi';
+import { login as apiLogin, forgotPassword } from '@/services/authApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Palette, type ThemeTokens } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -23,8 +23,26 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot]   = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  const handleForgot = useCallback(async () => {
+    if (!forgotEmail) { setError('Ingresá tu email.'); return; }
+    setError(''); setSuccess('');
+    setLoading(true);
+    try {
+      await forgotPassword(forgotEmail);
+      setSuccess('Te enviamos un email para restablecer tu contraseña.');
+      setShowForgot(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al enviar el email.');
+    } finally {
+      setLoading(false);
+    }
+  }, [forgotEmail]);
 
   const handleLogin = useCallback(async () => {
     if (!email || !password) {
@@ -88,18 +106,52 @@ export default function LoginScreen() {
             autoComplete="current-password"
           />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error   ? <Text style={styles.error}>{error}</Text>     : null}
+          {success ? <Text style={styles.success}>{success}</Text> : null}
 
-          <TouchableOpacity
-            style={[styles.cta, loading && styles.ctaDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading
-              ? <ActivityIndicator color={tokens.textOnCta} />
-              : <Text style={styles.ctaText}>Ingresar</Text>}
-          </TouchableOpacity>
+          {!showForgot ? (
+            <>
+              <TouchableOpacity style={styles.forgotLink} onPress={() => { setShowForgot(true); setError(''); setSuccess(''); }}>
+                <Text style={styles.forgotLinkText}>¿Olvidaste tu contraseña?</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cta, loading && styles.ctaDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color={tokens.textOnCta} />
+                  : <Text style={styles.ctaText}>Ingresar</Text>}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                value={forgotEmail}
+                onChangeText={setForgotEmail}
+                placeholder="juan@empresa.com"
+                placeholderTextColor={tokens.textMuted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <TouchableOpacity
+                style={[styles.cta, loading && styles.ctaDisabled]}
+                onPress={handleForgot}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading
+                  ? <ActivityIndicator color={tokens.textOnCta} />
+                  : <Text style={styles.ctaText}>Enviar link</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.forgotLink} onPress={() => { setShowForgot(false); setError(''); }}>
+                <Text style={styles.forgotLinkText}>← Volver al inicio de sesión</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <Link href="/(auth)/register" asChild>
             <TouchableOpacity style={styles.switchLink}>
@@ -183,6 +235,25 @@ function makeStyles(tokens: ThemeTokens) { return StyleSheet.create({
     backgroundColor: tokens.dangerBg,
     padding: 10,
     borderRadius: tokens.radiusSm,
+  },
+  success: {
+    color: '#15803d',
+    fontSize: tokens.fontSizeSmall,
+    fontWeight: '600',
+    marginBottom: tokens.spaceMd,
+    backgroundColor: '#dcfce7',
+    padding: 10,
+    borderRadius: tokens.radiusSm,
+  },
+  forgotLink: {
+    alignSelf: 'flex-start',
+    marginBottom: tokens.spaceSm,
+  },
+  forgotLinkText: {
+    color: tokens.textMuted,
+    fontSize: tokens.fontSizeSmall,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   cta: {
     backgroundColor: tokens.cta,
