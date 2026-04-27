@@ -21,11 +21,27 @@ import pool from "../db";
 
 const router = Router();
 
+async function snapToRoads(points: Array<{lat: number, lon: number}>): Promise<Array<{lat: number, lon: number}>> {
+  const apiKey = process.env.GOOGLE_ROADS_API_KEY;
+  if (!apiKey || points.length === 0) return points;
+  
+  const path = points.map(p => `${p.lat},${p.lon}`).join('|');
+  const url = `https://roads.googleapis.com/v1/snapToRoads?path=${encodeURIComponent(path)}&interpolate=true&key=${apiKey}`;
+  
+  const res = await fetch(url);
+  const data = await res.json();
+  
+  if (!data.snappedPoints) return points;
+  
+  return data.snappedPoints.map((p: any) => ({
+    lat: p.location.latitude,
+    lon: p.location.longitude,
+  }));
+}
+
 router.post("/", async (req: Request, res: Response) => {
   const { originLabel, destinationLabel, vehicle, origin, destination } = req.body;
 
-  // Valido que el request tenga los campos mínimos necesarios
-  // origin y destination deben tener lat y lon; vehicle define las restricciones del camión
   if (!origin || !destination || !vehicle) {
     res.status(400).json({
       found: false,
@@ -42,20 +58,16 @@ router.post("/", async (req: Request, res: Response) => {
   }
 
   try {
-    // Busco el nodo del grafo más cercano a las coordenadas de origen
-    // La función nearest_graph_node recibe (lon, lat) en ese orden porque PostGIS usa X, Y
     const resOrigen = await pool.query(
       "SELECT id, lat, lon FROM nearest_graph_node($1, $2)",
       [origin.lon, origin.lat]
     );
 
-    // Hago lo mismo para el destino
     const resDestino = await pool.query(
       "SELECT id, lat, lon FROM nearest_graph_node($1, $2)",
       [destination.lon, destination.lat]
     );
 
-    // Si alguno de los dos puntos no tiene un nodo cercano en el grafo, no puedo calcular la ruta
     if (resOrigen.rows.length === 0 || resDestino.rows.length === 0) {
       res.status(404).json({
         found: false,
@@ -74,12 +86,9 @@ router.post("/", async (req: Request, res: Response) => {
     const nodoOrigen = resOrigen.rows[0];
     const nodoDestino = resDestino.rows[0];
 
-    // Cargo solo la subred habilitada para camiones para evitar rutas por calles no permitidas
     const resGrafo = await pool.query("SELECT export_graph_json(FALSE)");
     const grafo = resGrafo.rows[0]["export_graph_json"];
 
-    // Ejecuto A* entre el nodo origen y el nodo destino con el perfil del camión
-    // Los IDs de nodo se convierten a string porque así los maneja el algoritmo
     const resultado = findTruckRoute(
       grafo,
       String(nodoOrigen.id),
@@ -87,7 +96,6 @@ router.post("/", async (req: Request, res: Response) => {
       vehicle
     );
 
-    // Si A* no encontró ningún camino válido, informo al cliente
     if (!resultado.found) {
       res.status(200).json({
         found: false,
@@ -103,55 +111,79 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
-    // Construyo el array de puntos de la ruta con las coordenadas reales de cada nodo
-    // El frontend usa estos puntos para dibujar la ruta en el mapa
     const path = await Promise.all(resultado.path.map(async (nodeId: string, index: number) => {
       let label = "";
-      // Para cada par de nodos consecutivos, busco el nombre de la calle que los une
+      let geometry: Array<{lat: number, lon: number}> = [];
+    
       if (index < resultado.path.length - 1) {
         const siguienteId = resultado.path[index + 1];
-        const resNombre = await pool.query(
-          `SELECT rv.nombre_buscable 
+        const resArista = await pool.query(
+          `SELECT rv.nombre_buscable,
+              ST_AsGeoJSON(a.geom) AS geom_json,
+              a.source AS src
            FROM aristas a
            JOIN red_vial rv ON rv.id = a.red_vial_id
-           WHERE a.source = $1::integer AND a.target = $2::integer
+           WHERE (a.source = $1::integer AND a.target = $2::integer)
+              OR (a.source = $2::integer AND a.target = $1::integer)
            ORDER BY a.costo ASC LIMIT 1`,
           [nodeId, siguienteId]
         );
-        if (resNombre.rows.length > 0) {
-          label = resNombre.rows[0].nombre_buscable ?? "";
+        if (resArista.rows.length > 0) {
+          label = resArista.rows[0].nombre_buscable ?? "";
+          if (resArista.rows[0].geom_json) {
+            const geoj = JSON.parse(resArista.rows[0].geom_json);
+            const coords = geoj.coordinates.map(([lon, lat]: [number, number]) => ({ lat, lon }));
+            const esInversa = resArista.rows[0].src !== Number(nodeId);
+            geometry = esInversa ? coords.reverse() : coords;
+          }
         }
       }
+    
       return {
         nodeId,
         lat: grafo.nodes[nodeId].lat,
         lon: grafo.nodes[nodeId].lon,
         label,
+        geometry,
       };
     }));
-  // Calculo la distancia real recorriendo las aristas del path
-  // sin contar las penalizaciones artificiales del A*
-  let distanciaRealM = 0;
-  for (let i = 0; i < resultado.path.length - 1; i++) {
-    const desde = resultado.path[i];
-    const hasta = resultado.path[i + 1];
-    const resArista = await pool.query(
-      `SELECT LEAST(costo, 10000) AS costo FROM aristas 
-       WHERE source = $1::integer AND target = $2::integer 
-       ORDER BY costo ASC LIMIT 1`,
-      [desde, hasta]
-    );
-    if (resArista.rows.length > 0) {
-      distanciaRealM += resArista.rows[0].costo;
+
+    let distanciaRealM = 0;
+    for (let i = 0; i < resultado.path.length - 1; i++) {
+      const desde = resultado.path[i];
+      const hasta = resultado.path[i + 1];
+      const resArista = await pool.query(
+        `SELECT LEAST(costo, 10000) AS costo FROM aristas 
+         WHERE source = $1::integer AND target = $2::integer 
+         ORDER BY costo ASC LIMIT 1`,
+        [desde, hasta]
+      );
+      if (resArista.rows.length > 0) {
+        distanciaRealM += resArista.rows[0].costo;
+      }
     }
-  }
 
-    // Estimo la duración asumiendo 30 km/h de velocidad promedio en ciudad
-    // Es una aproximación simple válida para el MVP
-    const velocidadMs = 30000 / 3600; // 30 km/h convertido a metros por segundo
-    const estimatedDurationMin = Math.round(resultado.distance / velocidadMs / 60);
+    // Junto todos los puntos de geometría en un array plano para hacer snap-to-road
+    const allGeometryPoints: Array<{lat: number, lon: number}> = [];
+    for (const point of path) {
+      if (point.geometry && point.geometry.length > 0) {
+        allGeometryPoints.push(...point.geometry);
+      } else {
+        allGeometryPoints.push({ lat: point.lat, lon: point.lon });
+      }
+    }
 
-    // Devuelvo la ruta completa en el formato del contrato de API
+    // Snap-to-road en chunks de 100 puntos (límite de la API)
+    const CHUNK_SIZE = 100;
+    const snappedPoints: Array<{lat: number, lon: number}> = [];
+    for (let i = 0; i < allGeometryPoints.length; i += CHUNK_SIZE) {
+      const chunk = allGeometryPoints.slice(i, i + CHUNK_SIZE);
+      const snapped = await snapToRoads(chunk);
+      snappedPoints.push(...snapped);
+    }
+
+    const velocidadMs = 30000 / 3600;
+
     res.status(200).json({
       found: true,
       routeId: `route-${Date.now()}`,
@@ -161,11 +193,11 @@ router.post("/", async (req: Request, res: Response) => {
       estimatedDurationMin: Math.round(distanciaRealM / velocidadMs / 60),
       routeSummary: "Ruta calculada correctamente.",
       path,
+      snappedPoints,
       warnings: [],
     });
 
   } catch (error) {
-    // Si ocurre un error inesperado, lo registro en consola y aviso al cliente
     console.error("Error en /api/routes:", error);
     res.status(500).json({
       found: false,
