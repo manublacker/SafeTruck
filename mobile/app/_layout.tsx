@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { loadToken } from '@/services/api';
+import { Theme } from '@/constants/theme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -30,7 +31,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color={Theme.brand} />
       </View>
     );
   }

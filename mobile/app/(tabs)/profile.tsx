@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { Theme, Palette } from '@/constants/theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -41,26 +42,26 @@ export default function ProfileScreen() {
 
       {user?.trucks && user.trucks.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mis camiones</Text>
+          <Text style={styles.sectionTitle}>MIS CAMIONES</Text>
           {user.trucks.map((truck) => (
             <View key={truck.id} style={styles.truckCard}>
               <Text style={styles.truckName}>{truck.name}</Text>
               <View style={styles.truckSpecs}>
                 <View style={styles.spec}>
-                  <Text style={styles.specValue}>{truck.max_weight_kg.toLocaleString()} kg</Text>
-                  <Text style={styles.specKey}>peso máx.</Text>
+                  <Text style={styles.specValue}>{truck.max_weight_kg.toLocaleString()}<Text style={styles.specUnit}> kg</Text></Text>
+                  <Text style={styles.specKey}>PESO MÁX.</Text>
                 </View>
                 <View style={styles.spec}>
-                  <Text style={styles.specValue}>{truck.max_height_m} m</Text>
-                  <Text style={styles.specKey}>altura</Text>
+                  <Text style={styles.specValue}>{truck.max_height_m}<Text style={styles.specUnit}> m</Text></Text>
+                  <Text style={styles.specKey}>ALTURA</Text>
                 </View>
                 <View style={styles.spec}>
-                  <Text style={styles.specValue}>{truck.max_width_m} m</Text>
-                  <Text style={styles.specKey}>ancho</Text>
+                  <Text style={styles.specValue}>{truck.max_width_m}<Text style={styles.specUnit}> m</Text></Text>
+                  <Text style={styles.specKey}>ANCHO</Text>
                 </View>
                 <View style={styles.spec}>
-                  <Text style={styles.specValue}>{truck.max_length_m} m</Text>
-                  <Text style={styles.specKey}>largo</Text>
+                  <Text style={styles.specValue}>{truck.max_length_m}<Text style={styles.specUnit}> m</Text></Text>
+                  <Text style={styles.specKey}>LARGO</Text>
                 </View>
               </View>
             </View>
@@ -69,8 +70,8 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Cuenta</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.sectionTitle}>CUENTA</Text>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.85}>
           <Text style={styles.logoutText}>Cerrar sesión</Text>
         </TouchableOpacity>
       </View>
@@ -81,10 +82,10 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: Theme.surfaceAlt,
   },
   content: {
-    padding: 24,
+    padding: Theme.spaceXl,
     paddingTop: 60,
   },
   header: {
@@ -92,90 +93,96 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#1a73e8',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: Theme.brand,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: Theme.spaceMd,
   },
   avatarText: {
-    color: '#fff',
+    color: Palette.white,
     fontSize: 30,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   name: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '800',
+    color: Theme.textPrimary,
     marginBottom: 4,
+    letterSpacing: -0.3,
   },
   email: {
     fontSize: 14,
-    color: '#6b7280',
+    color: Theme.textSecond,
   },
   company: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: Theme.textMuted,
     marginTop: 2,
   },
   section: {
     marginBottom: 28,
   },
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9ca3af',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.textSecond,
+    letterSpacing: 1.4,
+    marginBottom: Theme.spaceMd,
   },
   truckCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: Theme.surface,
+    borderRadius: Theme.radiusMd,
+    padding: Theme.spaceLg,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: Theme.border,
   },
   truckName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 10,
+    fontWeight: '700',
+    color: Theme.textPrimary,
+    marginBottom: Theme.spaceMd,
   },
   truckSpecs: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   spec: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flex: 1,
   },
   specValue: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '800',
+    color: Theme.textPrimary,
+    letterSpacing: -0.3,
+  },
+  specUnit: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#1a73e8',
+    color: Theme.textSecond,
   },
   specKey: {
-    fontSize: 10,
-    color: '#9ca3af',
-    marginTop: 2,
+    fontSize: 9,
+    color: Theme.textSecond,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginTop: 4,
   },
   logoutButton: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: Theme.dangerBg,
+    borderRadius: Theme.radiusMd,
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: 'rgba(198, 40, 40, 0.2)',
   },
   logoutText: {
-    color: '#dc2626',
+    color: Theme.danger,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
