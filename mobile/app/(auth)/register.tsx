@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { Link, router } from 'expo-router';
-import { register as apiRegister } from '@/services/authApi';
+import { register as apiRegister, VerificationNeededError } from '@/services/authApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Palette, type ThemeTokens } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -26,6 +26,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [company, setCompany] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = useCallback(async () => {
@@ -48,6 +49,7 @@ export default function RegisterScreen() {
       return;
     }
     setError('');
+    setSuccess('');
     setLoading(true);
     try {
       const res = await apiRegister({
@@ -59,7 +61,11 @@ export default function RegisterScreen() {
       login(res.token, res.user);
       router.replace('/(tabs)');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al registrarse.');
+      if (err instanceof VerificationNeededError) {
+        setSuccess(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : 'Error al registrarse.');
+      }
     } finally {
       setLoading(false);
     }
@@ -130,7 +136,8 @@ export default function RegisterScreen() {
             placeholderTextColor={tokens.textMuted}
           />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error   ? <Text style={styles.error}>{error}</Text>     : null}
+          {success ? <Text style={styles.success}>{success}</Text> : null}
 
           <TouchableOpacity
             style={[styles.cta, loading && styles.ctaDisabled]}
@@ -227,6 +234,15 @@ function makeStyles(tokens: ThemeTokens) { return StyleSheet.create({
     fontWeight: '600',
     marginBottom: tokens.spaceMd,
     backgroundColor: tokens.dangerBg,
+    padding: 10,
+    borderRadius: tokens.radiusSm,
+  },
+  success: {
+    color: '#15803d',
+    fontSize: tokens.fontSizeSmall,
+    fontWeight: '600',
+    marginBottom: tokens.spaceMd,
+    backgroundColor: '#dcfce7',
     padding: 10,
     borderRadius: tokens.radiusSm,
   },

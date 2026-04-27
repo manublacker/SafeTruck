@@ -1,4 +1,11 @@
 import { supabase } from "@/lib/supabase";
+
+export class VerificationNeededError extends Error {
+  constructor() {
+    super("¡Cuenta creada! Revisá tu email para activar tu cuenta y después iniciá sesión.");
+    this.name = "VerificationNeededError";
+  }
+}
 import type { AuthResponse, RegisterPayload, LoginPayload } from "@/types/auth";
 
 const API_URL = "https://safetruck-backend.icysky-af60cdde.canadacentral.azurecontainerapps.io";
@@ -27,7 +34,7 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
 
   // Si Supabase requiere verificación de email, no hay sesión todavía
   if (!data.session) {
-    throw new Error("Verificá tu email para activar tu cuenta. Revisá tu bandeja de entrada.");
+    throw new VerificationNeededError();
   }
 
   return callProfile(data.session.access_token, {
