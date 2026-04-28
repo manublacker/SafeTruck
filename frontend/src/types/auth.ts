@@ -11,7 +11,7 @@ export interface Truck {
 }
 
 export interface AuthUser {
-  id: number;
+  id: string;
   email: string;
   full_name: string;
   company: string | null;

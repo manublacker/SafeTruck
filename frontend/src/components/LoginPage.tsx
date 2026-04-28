@@ -1,5 +1,5 @@
 import { useState, useCallback, type FormEvent } from "react";
-import { login as apiLogin, register as apiRegister } from "@/services/authApi";
+import { login as apiLogin, register as apiRegister, forgotPassword, VerificationNeededError } from "@/services/authApi";
 import { useAuth } from "@/contexts/AuthContext";
 
 type Tab = "login" | "register";
@@ -8,11 +8,16 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [tab, setTab]         = useState<Tab>("login");
   const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Login fields
   const [loginEmail, setLoginEmail]       = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+
+  // Forgot password
+  const [showForgot, setShowForgot]   = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
 
   // Register fields
   const [regEmail, setRegEmail]       = useState("");
@@ -31,13 +36,15 @@ export default function LoginPage() {
   const switchTab = (t: Tab) => {
     setTab(t);
     setError("");
+    setSuccess("");
+    setShowForgot(false);
     setAddTruck(false);
   };
 
   const handleLogin = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
-      setError("");
+      setError(""); setSuccess("");
       setLoading(true);
       try {
         const res = await apiLogin({ email: loginEmail, password: loginPassword });
@@ -51,23 +58,37 @@ export default function LoginPage() {
     [loginEmail, loginPassword, login]
   );
 
+  const handleForgot = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+      setError(""); setSuccess("");
+      if (!forgotEmail) { setError("Ingresá tu email."); return; }
+      setLoading(true);
+      try {
+        await forgotPassword(forgotEmail);
+        setSuccess("Te enviamos un email para restablecer tu contraseña. Revisá tu bandeja de entrada.");
+        setShowForgot(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al enviar el email.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [forgotEmail]
+  );
+
   const handleRegister = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
-      setError("");
+      setError(""); setSuccess("");
       if (regPassword.length < 6) {
         setError("La contraseña debe tener al menos 6 caracteres.");
         return;
       }
       if (addTruck) {
-        if (!truckName.trim()) {
-          setError("Ingresá el nombre del camión.");
-          return;
-        }
-        const w = parseFloat(truckWeight);
-        const h = parseFloat(truckHeight);
-        const wd = parseFloat(truckWidth);
-        const l = parseFloat(truckLength);
+        if (!truckName.trim()) { setError("Ingresá el nombre del camión."); return; }
+        const w = parseFloat(truckWeight), h = parseFloat(truckHeight);
+        const wd = parseFloat(truckWidth),  l = parseFloat(truckLength);
         if ([w, h, wd, l].some((v) => isNaN(v) || v <= 0)) {
           setError("Completá todas las dimensiones del camión con valores válidos.");
           return;
@@ -76,25 +97,22 @@ export default function LoginPage() {
       setLoading(true);
       try {
         const trucks = addTruck
-          ? [{
-              name:           truckName.trim(),
-              max_weight_kg:  parseFloat(truckWeight),
-              max_height_m:   parseFloat(truckHeight),
-              max_width_m:    parseFloat(truckWidth),
-              max_length_m:   parseFloat(truckLength),
-            }]
+          ? [{ name: truckName.trim(), max_weight_kg: parseFloat(truckWeight),
+               max_height_m: parseFloat(truckHeight), max_width_m: parseFloat(truckWidth),
+               max_length_m: parseFloat(truckLength) }]
           : undefined;
 
         const res = await apiRegister({
-          email:     regEmail,
-          password:  regPassword,
-          full_name: regName,
-          company:   regCompany || undefined,
-          trucks,
+          email: regEmail, password: regPassword,
+          full_name: regName, company: regCompany || undefined, trucks,
         });
         login(res.token, res.user);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Error al registrarse.");
+        if (err instanceof VerificationNeededError) {
+          setSuccess(err.message);
+        } else {
+          setError(err instanceof Error ? err.message : "Error al registrarse.");
+        }
       } finally {
         setLoading(false);
       }
@@ -109,9 +127,9 @@ export default function LoginPage() {
       <div className="login-card">
         {/* Brand */}
         <div className="login-brand">
-          <span className="login-logo">🚛</span>
+          <img src="/safetruck-logo.png" alt="SafeTruck" className="login-logo-img" />
           <div>
-            <p className="login-eyebrow">Plataforma de rutas</p>
+            <p className="login-eyebrow">Logística AMBA</p>
             <h1 className="login-title">SafeTruck</h1>
           </div>
         </div>
@@ -122,50 +140,53 @@ export default function LoginPage() {
 
         {/* Tabs */}
         <div className="auth-tabs login-tabs">
-          <button
-            type="button"
-            className={`auth-tab${tab === "login" ? " active" : ""}`}
-            onClick={() => switchTab("login")}
-          >
+          <button type="button" className={`auth-tab${tab === "login" ? " active" : ""}`} onClick={() => switchTab("login")}>
             Iniciar sesión
           </button>
-          <button
-            type="button"
-            className={`auth-tab${tab === "register" ? " active" : ""}`}
-            onClick={() => switchTab("register")}
-          >
+          <button type="button" className={`auth-tab${tab === "register" ? " active" : ""}`} onClick={() => switchTab("register")}>
             Registrarse
           </button>
         </div>
 
+        {error   && <p className="auth-error">{error}</p>}
+        {success && <p className="auth-success">{success}</p>}
+
         {/* Login form */}
-        {tab === "login" && (
+        {tab === "login" && !showForgot && (
           <form className="auth-form" onSubmit={handleLogin}>
             <div className="field">
               <span>Email</span>
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="juan@empresa.com"
-              />
+              <input type="email" autoComplete="email" required value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)} placeholder="juan@empresa.com" />
             </div>
             <div className="field">
               <span>Contraseña</span>
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="••••••"
-              />
+              <input type="password" autoComplete="current-password" required value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)} placeholder="••••••" />
             </div>
-            {error && <p className="auth-error">{error}</p>}
+            <button type="button" className="forgot-link" onClick={() => { setShowForgot(true); setError(""); setSuccess(""); }}>
+              ¿Olvidaste tu contraseña?
+            </button>
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? "Ingresando…" : "Ingresar"}
+            </button>
+          </form>
+        )}
+
+        {/* Forgot password form */}
+        {tab === "login" && showForgot && (
+          <form className="auth-form" onSubmit={handleForgot}>
+            <p className="forgot-hint">Ingresá tu email y te enviamos un link para restablecer tu contraseña.</p>
+            <div className="field">
+              <span>Email</span>
+              <input type="email" autoComplete="email" required value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)} placeholder="juan@empresa.com" />
+            </div>
+            <button type="submit" className="login-submit-btn" disabled={loading}>
+              {loading ? "Enviando…" : "Enviar link"}
+            </button>
+            <button type="button" className="forgot-link" onClick={() => { setShowForgot(false); setError(""); }}>
+              ← Volver al inicio de sesión
             </button>
           </form>
         )}
@@ -175,130 +196,54 @@ export default function LoginPage() {
           <form className="auth-form" onSubmit={handleRegister}>
             <div className="field">
               <span>Nombre completo</span>
-              <input
-                type="text"
-                autoComplete="name"
-                required
-                value={regName}
-                onChange={(e) => setRegName(e.target.value)}
-                placeholder="Juan Pérez"
-              />
+              <input type="text" autoComplete="name" required value={regName}
+                onChange={(e) => setRegName(e.target.value)} placeholder="Juan Pérez" />
             </div>
             <div className="field">
               <span>Email</span>
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                placeholder="juan@empresa.com"
-              />
+              <input type="email" autoComplete="email" required value={regEmail}
+                onChange={(e) => setRegEmail(e.target.value)} placeholder="juan@empresa.com" />
             </div>
             <div className="field">
               <span>Contraseña</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={6}
-                value={regPassword}
-                onChange={(e) => setRegPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-              />
+              <input type="password" autoComplete="new-password" required minLength={6} value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
             </div>
             <div className="field">
               <span>Empresa <em className="auth-optional">(opcional)</em></span>
-              <input
-                type="text"
-                value={regCompany}
-                onChange={(e) => setRegCompany(e.target.value)}
-                placeholder="Transportes SA"
-              />
+              <input type="text" value={regCompany}
+                onChange={(e) => setRegCompany(e.target.value)} placeholder="Transportes SA" />
             </div>
 
-            {/* Truck toggle */}
             <div className="truck-toggle-row">
               <label className="truck-toggle-label">
-                <input
-                  type="checkbox"
-                  className="truck-checkbox"
-                  checked={addTruck}
-                  onChange={(e) => setAddTruck(e.target.checked)}
-                />
-                <span className="truck-toggle-text">
-                  Agregar un camión
-                  <em className="auth-optional"> (opcional)</em>
-                </span>
+                <input type="checkbox" className="truck-checkbox" checked={addTruck}
+                  onChange={(e) => setAddTruck(e.target.checked)} />
+                <span className="truck-toggle-text">Agregar un camión <em className="auth-optional">(opcional)</em></span>
                 {addTruck && <span className="truck-toggle-badge">1</span>}
               </label>
 
-              {/* Popup */}
               {addTruck && (
                 <div className="truck-popup">
                   <p className="truck-popup-title">Datos del camión</p>
-
                   <div className="field">
                     <span>Nombre</span>
-                    <input
-                      type="text"
-                      value={truckName}
-                      onChange={(e) => setTruckName(e.target.value)}
-                      placeholder="Volvo FH #1"
-                    />
+                    <input type="text" value={truckName} onChange={(e) => setTruckName(e.target.value)} placeholder="Volvo FH #1" />
                   </div>
-
                   <div className="truck-popup-grid">
-                    <div className="field">
-                      <span>Peso máx. (kg)</span>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={truckWeight}
-                        onChange={(e) => setTruckWeight(e.target.value)}
-                        placeholder="12000"
-                      />
-                    </div>
-                    <div className="field">
-                      <span>Alto máx. (m)</span>
-                      <input
-                        type="number"
-                        min="0.1"
-                        step="0.01"
-                        value={truckHeight}
-                        onChange={(e) => setTruckHeight(e.target.value)}
-                        placeholder="4.1"
-                      />
-                    </div>
-                    <div className="field">
-                      <span>Ancho máx. (m)</span>
-                      <input
-                        type="number"
-                        min="0.1"
-                        step="0.01"
-                        value={truckWidth}
-                        onChange={(e) => setTruckWidth(e.target.value)}
-                        placeholder="2.5"
-                      />
-                    </div>
-                    <div className="field">
-                      <span>Largo máx. (m)</span>
-                      <input
-                        type="number"
-                        min="0.1"
-                        step="0.01"
-                        value={truckLength}
-                        onChange={(e) => setTruckLength(e.target.value)}
-                        placeholder="12"
-                      />
-                    </div>
+                    <div className="field"><span>Peso máx. (kg)</span>
+                      <input type="number" min="1" step="1" value={truckWeight} onChange={(e) => setTruckWeight(e.target.value)} placeholder="12000" /></div>
+                    <div className="field"><span>Alto máx. (m)</span>
+                      <input type="number" min="0.1" step="0.01" value={truckHeight} onChange={(e) => setTruckHeight(e.target.value)} placeholder="4.1" /></div>
+                    <div className="field"><span>Ancho máx. (m)</span>
+                      <input type="number" min="0.1" step="0.01" value={truckWidth} onChange={(e) => setTruckWidth(e.target.value)} placeholder="2.5" /></div>
+                    <div className="field"><span>Largo máx. (m)</span>
+                      <input type="number" min="0.1" step="0.01" value={truckLength} onChange={(e) => setTruckLength(e.target.value)} placeholder="12" /></div>
                   </div>
                 </div>
               )}
             </div>
 
-            {error && <p className="auth-error">{error}</p>}
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? "Creando cuenta…" : "Crear cuenta"}
             </button>

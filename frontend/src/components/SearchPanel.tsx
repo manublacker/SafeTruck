@@ -191,18 +191,6 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
 
   return (
     <section className="search-panel">
-      <div className="brand-row">
-        <div>
-          <p className="eyebrow">SafeTruck</p>
-          <h1>Rutas para camiones</h1>
-          <p className="hero-copy">
-            Planeá trayectos urbanos con foco en tránsito pesado y validación sobre la red vial
-            cargada en tiempo real.
-          </p>
-        </div>
-        <p className="status-pill">{statusLabel}</p>
-      </div>
-
       <form id="route-form" className="route-form" onSubmit={handleSubmit}>
 
         {/* ── Origen ── */}
