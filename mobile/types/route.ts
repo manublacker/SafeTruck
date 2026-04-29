@@ -30,6 +30,7 @@ export interface RouteNode {
 export interface RouteResponse {
   found: boolean;
   routeId: string | null;
+  tripId: number | null;
   originLabel: string;
   destinationLabel: string;
   distanceM: number;

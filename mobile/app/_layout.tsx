@@ -4,7 +4,7 @@ import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
-
+import { registerPushToken } from '@/services/notifications';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider as AppThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { loadToken } from '@/services/api';
@@ -25,6 +25,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
       router.replace('/(tabs)');
+    } else if (user) {
+      // registro el push token ahora que el usuario está autenticado
+      registerPushToken();
     }
   }, [user, isLoading, segments]);
 

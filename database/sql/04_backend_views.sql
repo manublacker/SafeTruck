@@ -52,8 +52,6 @@ WHERE a.source IS NOT NULL
 -- -----------------------------------------------------------------------------
 -- Función: nearest_graph_node(lon, lat)
 -- Dado un punto geográfico devuelve el nodo del grafo más cercano.
--- Uso desde TypeScript:
---   SELECT * FROM nearest_graph_node(-58.3816, -34.6037);
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION nearest_graph_node(
     p_lon DOUBLE PRECISION,
@@ -75,20 +73,13 @@ LANGUAGE sql STABLE AS $$
             ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography  
         )                                   AS distancia_m
     FROM nodos n
-    ORDER BY n.geom <-> ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326) -- ordena por cercania usando índice espacial
+    ORDER BY n.geom <-> ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)
     LIMIT 1;
 $$;
 
 -- -----------------------------------------------------------------------------
 -- Función: export_graph_json(p_only_truck_allowed)
--- Devuelve el grafo como JSONB en el formato exacto que espera Algorithm/astar.ts:
--- {
---   "nodes":     { "<id>": { "id": "<id>", "lat": float, "lon": float } },
---   "adjacency": { "<id>": [ { "to": "<id>", "lengthM": float, "truckAllowed": bool } ] }
--- }
--- Uso:
---   SELECT export_graph_json(FALSE);  -- grafo completo
---   SELECT export_graph_json(TRUE);   -- solo calles habilitadas para camiones
+-- Devuelve el grafo como JSONB en el formato exacto que espera astar.ts.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION export_graph_json(
     p_only_truck_allowed BOOLEAN DEFAULT FALSE
@@ -118,7 +109,8 @@ LANGUAGE sql STABLE AS $$
                         jsonb_build_object(
                             'to',           to_node::TEXT,
                             'lengthM',      length_m,
-                            'truckAllowed', truck_allowed
+                            'truckAllowed', truck_allowed,
+                            'aristaId',     arista_id
                         )
                     ) AS edges
                 FROM backend_aristas_dirigidas

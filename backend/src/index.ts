@@ -14,8 +14,11 @@ import swaggerSpec from "./swagger";
 import routeRouter from "./routes/route";
 import municipioParser from "./municipio-parser";
 import searchRouter from "./routes/search";
+import reportsRouter from "./routes/reports";
 import authRouter from "./routes/auth";
+import usersRouter from "./routes/users";
 import { authMiddleware } from "./middleware/authMiddleware";
+import { notifyPendingTrips } from "./jobs/notifyTrips";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -43,26 +46,32 @@ app.get("/api/docs.json", (_req, res) => {
 app.use("/api/auth", authRouter);
 
 // Guard JWT: protege todas las rutas /api/* excepto /api/auth y /api/docs
-app.use("/api", (req, res, next) => {
-  if (
-    req.path.startsWith("/auth") ||
-    req.path.startsWith("/docs")
-  ) {
-    return next();
-  }
-  return authMiddleware(req, res, next);
-});
+// app.use("/api", (req, res, next) => {
+//   if (
+//     req.path.startsWith("/auth") ||
+//     req.path.startsWith("/docs")
+//   ) {
+//     return next();
+//   }
+//   return authMiddleware(req, res, next);
+// });
 
 // Rutas protegidas
 app.use("/api/routes", routeRouter);
 app.use("/api/municipio", municipioParser);
 app.use("/api/search", searchRouter);
+app.use("/api/reports", reportsRouter);
+app.use("/api/users", usersRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "SafeTruck API" });
 });
 
 app.use(express.static(path.join(__dirname, "../../frontend")));
+
+// corro el job de notificaciones cada 6 horas
+notifyPendingTrips(); // corre una vez al arrancar
+setInterval(notifyPendingTrips, 6 * 60 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

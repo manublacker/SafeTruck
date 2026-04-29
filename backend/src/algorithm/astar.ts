@@ -28,6 +28,9 @@ interface GraphNode {
 interface GraphEdge {
   to: NodeId;                  // nodo destino de la arista
   lengthM: number;             // longitud en metros
+  aristaId?: number;           // id de la arista en la tabla aristas (para historial cooperativo)
+  trustScore?: number;         // score cooperativo de la arista (-inf a +inf)
+  trustStatus?: string;        // 'habilitada' | 'bloqueada' | 'desconocida'
 
   // Restricciones físicas / legales
   truckAllowed?: boolean;      // si false, el camión no puede circular
@@ -217,7 +220,16 @@ function isEdgeAllowed(edge: GraphEdge, vehicle: VehicleProfile): boolean {
     if (options.avoidGravel && edge.surface === "gravel") cost += 1500;
     if (options.preferHighways && edge.highway) cost -= 300;
     if (edge.trafficPenalty !== undefined) cost += edge.trafficPenalty;
-  
+
+    // penalización del sistema cooperativo
+    if (edge.trustStatus === 'bloqueada') {
+        return Infinity; // excluye la arista del ruteo
+    }
+    if (edge.trustScore !== undefined && edge.trustScore < 0) {
+        // penalización proporcional al score negativo
+        cost += Math.abs(edge.trustScore) * 500;
+    }
+
     return Math.max(cost, 1);
   }
 //Valida que el origen y destino existan dentro del grafo.
