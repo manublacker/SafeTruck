@@ -52,50 +52,36 @@ const plans: Plan[] = [
 ];
 
 const Plans = () => (
-  <section id="planes" className="min-h-[calc(100dvh-88px)] bg-white py-16 px-6 flex items-center justify-center scroll-mt-[88px]">
-    <div className="max-w-5xl mx-auto">
-      <h2 className="text-4xl font-semibold text-brand-dark text-center mb-4">
-        Planes para cada flota
-      </h2>
-      <p className="text-gray-500 text-center mb-16">
-        Sin contratos anuales. Cancelás cuando quieras.
-      </p>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+  <section id="planes" className="landing-plans">
+    <div className="landing-section__inner">
+      <header className="landing-section__header">
+        <h2 className="landing-section__title">Planes para cada flota</h2>
+        <p className="landing-plans__subtitle">Sin contratos anuales. Cancelás cuando quieras.</p>
+      </header>
+      <div className="landing-plans__grid">
         {plans.map((p) => (
           <div
             key={p.name}
-            className={`relative rounded-2xl p-8 bg-white flex flex-col ${
-              p.highlighted
-                ? "border-2 border-brand-red shadow-xl md:scale-105"
-                : "border border-gray-100 shadow-sm"
-            }`}
+            className={`landing-plan-card${p.highlighted ? " landing-plan-card--highlighted" : ""}`}
           >
             {p.highlighted && (
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-red text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
-                Más elegido
-              </span>
+              <span className="landing-plan-card__badge">Más elegido</span>
             )}
-            <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-2">
-              {p.name}
-            </h3>
-            <div className="mb-6">
-              <span className="text-5xl font-bold text-brand-dark">{p.price}</span>
-              <span className="text-gray-500 ml-1">USD/mes</span>
+            <p className="landing-plan-card__name">{p.name}</p>
+            <div className="landing-plan-card__price-row">
+              <span className="landing-plan-card__price">{p.price}</span>
+              <span className="landing-plan-card__period">USD/mes</span>
             </div>
-            <ul className="space-y-3 mb-8 flex-1">
+            <ul className="landing-plan-card__features">
               {p.features.map((f) => (
-                <li key={f} className="flex items-start gap-3 text-gray-700">
-                  <CheckCircle2 size={20} className="text-brand-red flex-shrink-0 mt-0.5" />
+                <li key={f} className="landing-plan-card__feature">
+                  <CheckCircle2 size={20} className="landing-plan-card__check" />
                   <span>{f}</span>
                 </li>
               ))}
             </ul>
             <button
-              className={`w-full rounded-full px-6 py-3 font-semibold transition-colors ${
-                p.highlighted
-                  ? "bg-brand-red text-white hover:bg-red-700"
-                  : "border border-brand-dark text-brand-dark hover:bg-gray-50"
-              }`}
+              className={`landing-plan-card__cta${p.highlighted ? " landing-plan-card__cta--primary" : " landing-plan-card__cta--outline"}`}
             >
               {p.cta}
             </button>

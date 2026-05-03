@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login as apiLogin, signInWithGoogle } from "@/services/authApi";
+import safeTruckLogo from "@/assets/logo_safetruck.png";
 import { useAuth } from "@/contexts/AuthContext";
 
 const GoogleIcon = () => (
@@ -49,81 +50,73 @@ const Login = () => {
   };
 
   return (
-    <div className="tw-page font-sans min-h-screen bg-[#1C2B3A]">
-      <main className="px-4 pt-10 pb-16 flex flex-col items-center">
-        <Link to="/" className="text-2xl font-bold text-white mb-8">
-          Safe Truck
+    <div className="auth-page tw-page">
+      <main className="auth-main">
+        <Link to="/" className="auth-logo">
+          <img src={safeTruckLogo} alt="Safe Truck" className="auth-logo__img" />
         </Link>
-        <div className="w-full max-w-[440px]">
-          <div className="bg-white rounded-2xl shadow-2xl p-8">
-            <h1 className="text-2xl font-semibold text-[#1C2B3A]">Iniciá sesión</h1>
-            <p className="text-gray-500 mb-6">Bienvenido de vuelta.</p>
 
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              <div>
-                <label className="block text-sm font-medium text-[#1C2B3A] mb-1">Email</label>
+        <div className="auth-card">
+          <div className="auth-card__inner">
+            <h1 className="auth-title">Iniciá sesión</h1>
+            <p className="auth-subtitle">Bienvenido de vuelta.</p>
+
+            <form onSubmit={handleSubmit} className="auth-fields" noValidate>
+              <div className="auth-field">
+                <label className="auth-field__label">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="empresa@mail.com"
                   maxLength={255}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-[#1C2B3A] text-[#1C2B3A]"
+                  className="auth-input"
                 />
-                {errors.email && <p className="text-[#E8202A] text-sm mt-1">{errors.email}</p>}
+                {errors.email && <p className="auth-error">{errors.email}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[#1C2B3A] mb-1">Contraseña</label>
+              <div className="auth-field">
+                <label className="auth-field__label">Contraseña</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Tu contraseña"
                   maxLength={128}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-[#1C2B3A] text-[#1C2B3A]"
+                  className="auth-input"
                 />
-                {errors.password && <p className="text-[#E8202A] text-sm mt-1">{errors.password}</p>}
+                {errors.password && <p className="auth-error">{errors.password}</p>}
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
+              <div className="auth-field" style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <label className="auth-checkbox-label">
                   <input
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 accent-[#E8202A]"
+                    className="auth-checkbox"
                   />
                   Recordarme
                 </label>
-                <a href="#" className="text-sm text-[#E8202A] hover:underline">¿Olvidaste tu contraseña?</a>
+                <a href="#" className="auth-link" style={{ fontSize: "0.875rem" }}>¿Olvidaste tu contraseña?</a>
               </div>
 
-              <button
-                type="submit"
-                className="w-full bg-[#E8202A] text-white rounded-full py-3 font-semibold hover:bg-red-700 transition-colors"
-              >
+              <button type="submit" className="auth-btn" style={{ marginTop: "0.5rem" }}>
                 Iniciar sesión
               </button>
             </form>
 
-            <div className="text-center text-gray-400 text-sm my-4">— o —</div>
+            <div className="auth-divider">o</div>
 
-            <button
-              type="button"
-              onClick={handleGoogle}
-              className="w-full bg-white border border-gray-200 rounded-full py-3 text-gray-700 font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-            >
+            <button type="button" onClick={handleGoogle} className="auth-google-btn">
               <GoogleIcon />
               Continuar con Google
             </button>
           </div>
 
-          <p className="text-center text-gray-400 text-sm mt-6">
+          <p className="auth-footer-text" style={{ color: "#9ca3af" }}>
             ¿No tenés cuenta?{" "}
-            <Link to="/register" className="text-[#E8202A] hover:underline font-medium">
-              Registrá tu empresa
-            </Link>
+            <Link to="/register" className="auth-link">Registrá tu empresa</Link>
           </p>
         </div>
       </main>

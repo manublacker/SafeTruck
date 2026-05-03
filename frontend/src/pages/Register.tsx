@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Check, Mail, CheckCircle2, ArrowLeft } from "lucide-react";
-import safeTruckLogo from "@/assets/safe-truck-logo.png";
+import safeTruckLogo from "@/assets/logo_safetruck.png";
 import {
   signUpStart,
   resendSignupConfirmation,
@@ -53,56 +53,53 @@ const provinces = [
 const stepLabels = ["Acceso", "Tu empresa", "Verificación", "Plan"];
 
 const ProgressIndicator = ({ step }: { step: number }) => (
-  <div className="mb-8">
-    <div className="flex items-center justify-between">
-      {stepLabels.map((_, i) => {
+  <div className="register-progress">
+    <div className="register-progress__track">
+      {stepLabels.map((label, i) => {
         const idx = i + 1;
         const completed = idx < step;
         const active = idx === step;
         return (
-          <div key={i} className="flex items-center flex-1 last:flex-none">
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors ${
-                completed
-                  ? "bg-[#1C2B3A] border-[#1C2B3A] text-white"
-                  : active
-                  ? "bg-[#E8202A] border-[#E8202A] text-white"
-                  : "bg-white border-gray-300 text-gray-400"
-              }`}
-            >
-              {completed ? <Check size={18} /> : idx}
-            </div>
-            {i < stepLabels.length - 1 && (
+          <Fragment key={i}>
+            {i > 0 && (
               <div
-                className={`flex-1 h-0.5 mx-2 ${
-                  completed ? "bg-[#1C2B3A]" : "bg-gray-200"
-                }`}
+                className={[
+                  "register-progress__line",
+                  completed && "register-progress__line--done",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               />
             )}
-          </div>
+            <div className="register-progress__col">
+              <div
+                className={[
+                  "register-progress__circle",
+                  completed && "register-progress__circle--done",
+                  active && "register-progress__circle--active",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {completed ? <Check size={18} /> : idx}
+              </div>
+              <span
+                className={[
+                  "register-progress__label",
+                  active && "register-progress__label--active",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {label}
+              </span>
+            </div>
+          </Fragment>
         );
       })}
     </div>
-    <div className="flex justify-between mt-2">
-      {stepLabels.map((label, i) => (
-        <span
-          key={label}
-          className={`text-xs flex-1 ${i === 0 ? "text-left" : i === stepLabels.length - 1 ? "text-right" : "text-center"} ${
-            i + 1 === step ? "text-[#E8202A] font-semibold" : "text-gray-500"
-          }`}
-        >
-          {label}
-        </span>
-      ))}
-    </div>
   </div>
 );
-
-const inputClass =
-  "w-full rounded-lg border border-gray-300 px-4 py-3 text-[#1C2B3A] placeholder:text-gray-400 focus:outline-none focus:border-[#E8202A] focus:ring-1 focus:ring-[#E8202A] transition";
-
-const primaryBtn =
-  "w-full rounded-full bg-[#E8202A] text-white py-3 font-semibold hover:bg-red-700 transition-colors";
 
 const formatCuit = (v: string) => {
   const d = v.replace(/\D/g, "").slice(0, 11);
@@ -125,7 +122,6 @@ const Register = () => {
     return () => clearTimeout(t);
   }, [resendIn]);
 
-  // Si la sesión se activa (verificación por link de Supabase) avanzamos solos
   useEffect(() => {
     if (user && step <= 3) setStep(4);
   }, [user, step]);
@@ -137,12 +133,9 @@ const Register = () => {
 
   const validateStep1 = () => {
     const e: Record<string, string> = {};
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
-      e.email = "Email inválido";
-    if (data.password.length < 8)
-      e.password = "Mínimo 8 caracteres";
-    if (data.password !== data.confirmPassword)
-      e.confirmPassword = "Las contraseñas no coinciden";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Email inválido";
+    if (data.password.length < 8) e.password = "Debés ingresar mínimo 8 caracteres";
+    if (data.password !== data.confirmPassword) e.confirmPassword = "Las contraseñas no coinciden";
     if (!data.terms) e.terms = "Debés aceptar los términos";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -151,8 +144,7 @@ const Register = () => {
   const validateStep2 = () => {
     const e: Record<string, string> = {};
     if (!data.companyName.trim()) e.companyName = "Requerido";
-    if (!/^\d{2}-\d{8}-\d{1}$/.test(data.cuit))
-      e.cuit = "Formato XX-XXXXXXXX-X";
+    if (!/^\d{2}-\d{8}-\d{1}$/.test(data.cuit)) e.cuit = "Formato XX-XXXXXXXX-X";
     if (!data.legalName.trim()) e.legalName = "Requerido";
     if (!data.industry) e.industry = "Requerido";
     if (!data.fleetSize) e.fleetSize = "Requerido";
@@ -229,15 +221,13 @@ const Register = () => {
     code[i] = digit;
     update("code", code);
     if (digit && i < 5) {
-      const nextEl = document.getElementById(`code-${i + 1}`) as HTMLInputElement | null;
-      nextEl?.focus();
+      (document.getElementById(`code-${i + 1}`) as HTMLInputElement | null)?.focus();
     }
   };
 
   const handleCodeKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace" && !data.code[i] && i > 0) {
-      const prev = document.getElementById(`code-${i - 1}`) as HTMLInputElement | null;
-      prev?.focus();
+      (document.getElementById(`code-${i - 1}`) as HTMLInputElement | null)?.focus();
     }
   };
 
@@ -254,144 +244,131 @@ const Register = () => {
 
   const choosePlan = (plan: string) => {
     update("plan", plan);
-    // Final step, navigate home for now
     setTimeout(() => navigate("/"), 200);
   };
 
   return (
-    <div className="tw-page font-sans min-h-screen bg-[#1C2B3A]">
-      <main className="px-4 pt-10 pb-16 flex flex-col items-center">
-        <Link to="/" className="text-2xl font-bold text-white mb-8">
-          Safe Truck
+    <div className="auth-page tw-page">
+      <main className="auth-main">
+        <Link to="/" className="auth-logo">
+          <img src={safeTruckLogo} alt="Safe Truck" className="auth-logo__img" />
         </Link>
-        <div className="w-full max-w-[520px]">
-          <div className="bg-white rounded-2xl shadow-2xl p-8">
+
+        <div className="auth-card">
+          <div className="auth-card__inner">
             <ProgressIndicator step={step} />
 
             {step > 1 && step < 4 && (
-              <button
-                onClick={() => setStep(step - 1)}
-                className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
-              >
+              <button onClick={() => setStep(step - 1)} className="auth-back">
                 <ArrowLeft size={16} /> Volver
               </button>
             )}
 
-            <div key={step} className="animate-in fade-in duration-300">
+            <div key={step}>
               {step === 1 && (
                 <div>
-                  <h1 className="text-2xl font-semibold text-[#1C2B3A] mb-2">
-                    Creá tu cuenta
-                  </h1>
-                  <p className="text-gray-500 mb-6">
-                    Ingresá los datos para acceder a Safe Truck.
-                  </p>
+                  <h1 className="auth-title">Creá tu cuenta</h1>
+                  <p className="auth-subtitle">Ingresá los datos para acceder a Safe Truck.</p>
 
-                  <div className="space-y-4">
-                    <div>
+                  <div className="auth-fields">
+                    <div className="auth-field">
                       <input
                         type="email"
                         placeholder="empresa@mail.com"
                         value={data.email}
                         onChange={(e) => update("email", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       />
-                      {errors.email && <p className="text-[#E8202A] text-sm mt-1">{errors.email}</p>}
+                      {errors.email && <p className="auth-error">{errors.email}</p>}
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <input
                         type="password"
-                        placeholder="Mínimo 8 caracteres"
+                        placeholder="Contraseña"
                         value={data.password}
                         onChange={(e) => update("password", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       />
-                      {errors.password && <p className="text-[#E8202A] text-sm mt-1">{errors.password}</p>}
+                      {errors.password && <p className="auth-error">{errors.password}</p>}
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <input
                         type="password"
                         placeholder="Repetí tu contraseña"
                         value={data.confirmPassword}
                         onChange={(e) => update("confirmPassword", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       />
-                      {errors.confirmPassword && <p className="text-[#E8202A] text-sm mt-1">{errors.confirmPassword}</p>}
+                      {errors.confirmPassword && <p className="auth-error">{errors.confirmPassword}</p>}
                     </div>
-                    <div>
-                      <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                    <div className="auth-field">
+                      <label className="auth-checkbox-label">
                         <input
                           type="checkbox"
                           checked={data.terms}
                           onChange={(e) => update("terms", e.target.checked)}
-                          className="mt-1 accent-[#E8202A]"
+                          className="auth-checkbox"
                         />
                         <span>
                           Acepto los{" "}
-                          <a href="#" className="text-[#E8202A] hover:underline">Términos y condiciones</a>{" "}
+                          <a href="#" className="auth-link">Términos y condiciones</a>{" "}
                           y la{" "}
-                          <a href="#" className="text-[#E8202A] hover:underline">Política de privacidad</a>
+                          <a href="#" className="auth-link">Política de privacidad</a>
                         </span>
                       </label>
-                      {errors.terms && <p className="text-[#E8202A] text-sm mt-1">{errors.terms}</p>}
+                      {errors.terms && <p className="auth-error">{errors.terms}</p>}
                     </div>
                   </div>
 
-                  <button onClick={next} className={`${primaryBtn} mt-6`}>
-                    Continuar
-                  </button>
-                  <p className="text-center text-sm text-gray-500 mt-4">
+                  <button onClick={next} className="auth-btn">Continuar</button>
+                  <p className="auth-footer-text">
                     ¿Ya tenés cuenta?{" "}
-                    <Link to="/login" className="text-[#E8202A] font-medium hover:underline">
-                      Iniciá sesión
-                    </Link>
+                    <Link to="/login" className="auth-link">Iniciá sesión</Link>
                   </p>
                 </div>
               )}
 
               {step === 2 && (
                 <div>
-                  <h1 className="text-2xl font-semibold text-[#1C2B3A] mb-2">
-                    Tu empresa
-                  </h1>
-                  <p className="text-gray-500 mb-6">Contanos sobre tu flota.</p>
+                  <h1 className="auth-title">Tu empresa</h1>
+                  <p className="auth-subtitle">Contanos sobre tu flota.</p>
 
-                  <div className="space-y-4">
-                    <div>
+                  <div className="auth-fields">
+                    <div className="auth-field">
                       <input
                         type="text"
                         placeholder="Transportes S.A."
                         value={data.companyName}
                         onChange={(e) => update("companyName", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       />
-                      {errors.companyName && <p className="text-[#E8202A] text-sm mt-1">{errors.companyName}</p>}
+                      {errors.companyName && <p className="auth-error">{errors.companyName}</p>}
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <input
                         type="text"
                         placeholder="XX-XXXXXXXX-X"
                         value={data.cuit}
                         onChange={(e) => update("cuit", formatCuit(e.target.value))}
-                        className={inputClass}
+                        className="auth-input"
                       />
-                      {errors.cuit && <p className="text-[#E8202A] text-sm mt-1">{errors.cuit}</p>}
+                      {errors.cuit && <p className="auth-error">{errors.cuit}</p>}
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <input
                         type="text"
                         placeholder="Razón social oficial"
                         value={data.legalName}
                         onChange={(e) => update("legalName", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       />
-                      {errors.legalName && <p className="text-[#E8202A] text-sm mt-1">{errors.legalName}</p>}
+                      {errors.legalName && <p className="auth-error">{errors.legalName}</p>}
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <select
                         value={data.industry}
                         onChange={(e) => update("industry", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       >
                         <option value="">Rubro / tipo de carga</option>
                         <option>Carga general</option>
@@ -401,13 +378,13 @@ const Register = () => {
                         <option>Combustibles</option>
                         <option>Otros</option>
                       </select>
-                      {errors.industry && <p className="text-[#E8202A] text-sm mt-1">{errors.industry}</p>}
+                      {errors.industry && <p className="auth-error">{errors.industry}</p>}
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <select
                         value={data.fleetSize}
                         onChange={(e) => update("fleetSize", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       >
                         <option value="">Cantidad de camiones</option>
                         <option>1 a 5</option>
@@ -415,13 +392,13 @@ const Register = () => {
                         <option>21 a 50</option>
                         <option>Más de 50</option>
                       </select>
-                      {errors.fleetSize && <p className="text-[#E8202A] text-sm mt-1">{errors.fleetSize}</p>}
+                      {errors.fleetSize && <p className="auth-error">{errors.fleetSize}</p>}
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <select
                         value={data.country}
                         onChange={(e) => update("country", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       >
                         <option>Argentina</option>
                         <option>Uruguay</option>
@@ -430,42 +407,38 @@ const Register = () => {
                         <option>Brasil</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="auth-field">
                       <select
                         value={data.province}
                         onChange={(e) => update("province", e.target.value)}
-                        className={inputClass}
+                        className="auth-input"
                       >
                         <option value="">Provincia</option>
                         {provinces.map((p) => (
                           <option key={p}>{p}</option>
                         ))}
                       </select>
-                      {errors.province && <p className="text-[#E8202A] text-sm mt-1">{errors.province}</p>}
+                      {errors.province && <p className="auth-error">{errors.province}</p>}
                     </div>
                   </div>
 
-                  <button onClick={next} className={`${primaryBtn} mt-6`}>
-                    Continuar
-                  </button>
+                  <button onClick={next} className="auth-btn">Continuar</button>
                 </div>
               )}
 
               {step === 3 && (
                 <div>
-                  <h1 className="text-2xl font-semibold text-[#1C2B3A] mb-2">
-                    Verificá tu email
-                  </h1>
-                  <p className="text-gray-500 mb-8">
+                  <h1 className="auth-title">Verificá tu email</h1>
+                  <p className="auth-subtitle">
                     Te enviamos un código de 6 dígitos a{" "}
-                    <span className="text-[#1C2B3A] font-medium">{data.email || "tu email"}</span>.
+                    <strong>{data.email || "tu email"}</strong>.
                   </p>
 
-                  <div className="flex justify-center mb-8">
-                    <Mail size={56} className="text-[#E8202A]" />
+                  <div className="auth-mail-icon">
+                    <Mail size={56} />
                   </div>
 
-                  <div className="flex justify-center gap-2 mb-2">
+                  <div className="auth-code-inputs">
                     {data.code.map((c, i) => (
                       <input
                         key={i}
@@ -475,32 +448,28 @@ const Register = () => {
                         value={c}
                         onChange={(e) => handleCodeChange(i, e.target.value)}
                         onKeyDown={(e) => handleCodeKey(i, e)}
-                        className={`w-[52px] h-14 text-center text-2xl font-semibold rounded-lg border-2 focus:outline-none transition-colors ${
+                        className={[
+                          "auth-code-input",
                           allCodeFilled
-                            ? "border-[#1C2B3A]"
+                            ? "auth-code-input--complete"
                             : c
-                            ? "border-[#E8202A]"
-                            : "border-gray-300 focus:border-[#E8202A]"
-                        }`}
+                            ? "auth-code-input--filled"
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       />
                     ))}
                   </div>
-                  {errors.code && (
-                    <p className="text-[#E8202A] text-sm text-center mb-2">{errors.code}</p>
-                  )}
+                  {errors.code && <p className="auth-error" style={{ textAlign: "center" }}>{errors.code}</p>}
 
-                  <button onClick={next} className={`${primaryBtn} mt-6`}>
-                    Verificar código
-                  </button>
-                  <p className="text-center text-sm text-gray-500 mt-4">
+                  <button onClick={next} className="auth-btn">Verificar código</button>
+                  <p className="auth-footer-text">
                     ¿No recibiste el código?{" "}
                     {resendIn > 0 ? (
-                      <span className="text-gray-400">Reenviar en {resendIn}s</span>
+                      <span>Reenviar en {resendIn}s</span>
                     ) : (
-                      <button
-                        onClick={handleResend}
-                        className="text-[#E8202A] font-medium hover:underline"
-                      >
+                      <button onClick={handleResend} className="auth-link" style={{ background: "none", border: "none", cursor: "pointer", font: "inherit" }}>
                         Reenviar
                       </button>
                     )}
@@ -510,14 +479,12 @@ const Register = () => {
 
               {step === 4 && (
                 <div>
-                  <h1 className="text-2xl font-semibold text-[#1C2B3A] text-center">
-                    Elegí tu plan
-                  </h1>
-                  <p className="text-gray-500 text-center mb-8">
+                  <h1 className="auth-title" style={{ textAlign: "center" }}>Elegí tu plan</h1>
+                  <p className="auth-subtitle" style={{ textAlign: "center" }}>
                     Comenzá a trackear tu flota hoy.
                   </p>
 
-                  <div className="space-y-6">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                     <PlanCard
                       name="Starter"
                       price="$29"
@@ -565,7 +532,8 @@ const Register = () => {
 
                   <button
                     onClick={() => setStep(3)}
-                    className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mt-6 mx-auto"
+                    className="auth-back"
+                    style={{ margin: "1.5rem auto 0" }}
                   >
                     <ArrowLeft size={16} /> Volver
                   </button>
@@ -594,38 +562,27 @@ const PlanCard = ({
   highlighted?: boolean;
   onClick: () => void;
 }) => (
-  <div
-    className={`relative rounded-2xl p-6 bg-white ${
-      highlighted ? "border-2 border-[#E8202A]" : "border border-gray-200"
-    }`}
-  >
-    {highlighted && (
-      <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#E8202A] text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
-        Más elegido
-      </span>
-    )}
-    <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-2">
-      {name}
-    </h3>
-    <div className="mb-4">
-      <span className="text-4xl font-bold text-[#1C2B3A]">{price}</span>
-      <span className="text-gray-500 ml-1 text-sm">USD/mes</span>
+  <div className={["plan-card", highlighted && "plan-card--highlighted"].filter(Boolean).join(" ")}>
+    {highlighted && <span className="plan-card__badge">Más elegido</span>}
+    <p className="plan-card__name">{name}</p>
+    <div className="plan-card__price-row">
+      <span className="plan-card__price">{price}</span>
+      <span className="plan-card__period">USD/mes</span>
     </div>
-    <ul className="space-y-2 mb-6">
+    <ul className="plan-card__features">
       {features.map((f) => (
-        <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
-          <CheckCircle2 size={18} className="text-[#E8202A] flex-shrink-0 mt-0.5" />
+        <li key={f} className="plan-card__feature">
+          <CheckCircle2 size={18} className="plan-card__check" />
           <span>{f}</span>
         </li>
       ))}
     </ul>
     <button
       onClick={onClick}
-      className={`w-full rounded-full px-6 py-3 font-semibold transition-colors ${
-        highlighted
-          ? "bg-[#E8202A] text-white hover:bg-red-700"
-          : "border border-[#1C2B3A] text-[#1C2B3A] hover:bg-gray-50"
-      }`}
+      className={[
+        "plan-card__cta",
+        highlighted ? "plan-card__cta--primary" : "plan-card__cta--outline",
+      ].join(" ")}
     >
       {cta}
     </button>

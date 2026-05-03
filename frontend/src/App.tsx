@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -5,9 +6,11 @@ import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import AuthCallback from "@/pages/AuthCallback";
-import Dashboard from "@/pages/Dashboard";
 
 import "@/styles/tailwind.css";
+
+// Lazy load para que main.css y mobile.css no contaminen otras rutas
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
 
 export default function App() {
   return (
@@ -22,7 +25,9 @@ export default function App() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <Suspense fallback={<div style={{ minHeight: "100vh" }} />}>
+                  <Dashboard />
+                </Suspense>
               </ProtectedRoute>
             }
           />
