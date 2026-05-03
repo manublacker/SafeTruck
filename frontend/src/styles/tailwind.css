@@ -819,13 +819,13 @@
 
   .auth-logo {
     display: block;
-    margin-bottom: 0;
+    margin-bottom: 1.5rem;
   }
 
   .auth-logo__img {
-    height: 12rem;
+    height: 8.5rem;
     width: auto;
-    max-width: 420px;
+    max-width: 240px;
     display: block;
   }
 
