@@ -1,4 +1,5 @@
 import { useState, type MouseEvent } from "react";
+import safeTruckLogo from "@/assets/logo_safetruck.png";
 import { Menu, X } from "lucide-react";
 
 const links = [
@@ -36,6 +37,7 @@ const Navbar = () => {
           onClick={(event) => scrollToSection(event, "top")}
           className="landing-nav__brand"
         >
+          <img src={safeTruckLogo} alt="Safe Truck" className="landing-nav__logo" />
           Safe Truck
         </a>
 

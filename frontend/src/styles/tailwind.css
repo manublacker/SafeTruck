@@ -34,24 +34,24 @@
   }
 
 
-  .tw-page h1,
-  .tw-page h2,
-  .tw-page h3,
-  .tw-page h4,
-  .tw-page h5,
-  .tw-page p,
-  .tw-page ul,
-  .tw-page ol {
+  :where(.tw-page) h1,
+  :where(.tw-page) h2,
+  :where(.tw-page) h3,
+  :where(.tw-page) h4,
+  :where(.tw-page) h5,
+  :where(.tw-page) p,
+  :where(.tw-page) ul,
+  :where(.tw-page) ol {
     margin: 0;
     padding: 0;
   }
 
-  .tw-page ul,
-  .tw-page ol {
+  :where(.tw-page) ul,
+  :where(.tw-page) ol {
     list-style: none;
   }
 
-  .tw-page button {
+  :where(.tw-page) button {
     background: none;
     border: 0;
     padding: 0;
@@ -61,15 +61,15 @@
     cursor: pointer;
   }
 
-  .tw-page input,
-  .tw-page select,
-  .tw-page textarea {
+  :where(.tw-page) input,
+  :where(.tw-page) select,
+  :where(.tw-page) textarea {
     font-family: inherit;
     font-weight: inherit;
     color: inherit;
   }
 
-  .tw-page img {
+  :where(.tw-page) img {
     display: block;
     max-width: 100%;
   }
@@ -101,6 +101,18 @@
     font-weight: 700;
     color: var(--landing-brand-dark);
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .landing-nav__logo {
+    height: 3.5rem;
+    width: auto;
+    display: block;
+    background: var(--landing-cta);
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.6rem;
   }
 
   .landing-nav__links {
@@ -303,12 +315,12 @@
     font-size: clamp(2.5rem, 5vw, 4rem);
     font-weight: 700;
     line-height: 1.05;
+    margin-bottom: 6px;
   }
 
   .landing-section__subtitle {
-    margin-top: 1rem;
     color: var(--landing-brand-muted);
-    font-size: 1.125rem;
+    font-size: 1.5rem;
     line-height: 1.55;
   }
 
@@ -400,6 +412,7 @@
 
   .landing-plans__subtitle {
     color: var(--landing-brand-muted);
+    font-size: 1.5rem;
     text-align: center;
     margin-bottom: 4rem;
   }
@@ -809,16 +822,16 @@
     padding: 2rem;
   }
 
-  .auth-card__inner .auth-title {
+  .auth-title {
     font-size: 1.5rem;
     font-weight: 600;
     color: #1c2b3a;
     margin-bottom: 0.375rem;
   }
 
-  .auth-card__inner .auth-subtitle {
+  .auth-subtitle {
     color: #6b7280;
-    margin-bottom: 10px;
+    margin-bottom: 1.5rem;
   }
 
   .auth-fields {
@@ -861,7 +874,7 @@
     color: #9ca3af;
   }
 
-  .auth-field .auth-error {
+  .auth-error {
     color: #f24437;
     font-size: 0.875rem;
     margin-top: 0.25rem;
@@ -942,11 +955,11 @@
     color: #374151;
   }
 
-  .auth-card .auth-footer-text {
+  .auth-footer-text {
     text-align: center;
     font-size: 0.875rem;
     color: #6b7280;
-    margin-top: 4px;
+    margin-top: 1rem;
   }
 
   .auth-google-btn {

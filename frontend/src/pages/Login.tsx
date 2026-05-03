@@ -114,7 +114,7 @@ const Login = () => {
             </button>
           </div>
 
-          <p className="auth-footer-text" style={{ color: "#9ca3af" }}>
+          <p className="auth-footer-text" style={{ color: "#ffffff", fontSize: "1rem" }}>
             ¿No tenés cuenta?{" "}
             <Link to="/register" className="auth-link">Registrá tu empresa</Link>
           </p>
