@@ -3,10 +3,10 @@ import safeTruckLogo from "@/assets/logo_safetruck.png";
 import { Menu, X } from "lucide-react";
 
 const links = [
+  { label: "Qué ofrecemos", targetId: "que-ofrecemos" },
   { label: "Cómo funciona", targetId: "como-funciona" },
   { label: "Planes", targetId: "planes" },
   { label: "Nosotros", targetId: "nosotros" },
-  { label: "Contacto", targetId: "contacto" },
 ];
 
 const Navbar = () => {

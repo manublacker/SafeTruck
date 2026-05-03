@@ -12,8 +12,8 @@ const Index = () => {
     <div id="top" className="tw-page font-sans min-h-screen bg-background">
       <Navbar />
       <Hero />
-      <HowItWorks />
       <Features />
+      <HowItWorks />
       <Plans />
       <About />
       <FinalCta />

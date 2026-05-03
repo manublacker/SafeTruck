@@ -312,7 +312,7 @@
 
   .landing-section__title {
     color: var(--landing-brand-dark);
-    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-size: clamp(2.25rem, 4.4vw, 3.5rem);
     font-weight: 700;
     line-height: 1.05;
     margin-bottom: 6px;
@@ -320,7 +320,7 @@
 
   .landing-section__subtitle {
     color: var(--landing-brand-muted);
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     line-height: 1.55;
   }
 
@@ -403,9 +403,9 @@
   .landing-plans {
     min-height: var(--landing-section-height);
     background: #ffffff;
-    padding: 4rem 1.5rem;
+    padding: 2rem 1.5rem 4rem;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     scroll-margin-top: var(--landing-nav-height);
   }
@@ -414,7 +414,7 @@
     color: var(--landing-brand-muted);
     font-size: 1.5rem;
     text-align: center;
-    margin-bottom: 4rem;
+    margin-bottom: 2.5rem;
   }
 
   .landing-plans__grid {
@@ -433,12 +433,32 @@
     flex-direction: column;
     border: 1px solid #e5e7eb;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .landing-plan-card:hover {
+    transform: translateY(-6px);
+    border-color: var(--landing-cta);
+    box-shadow: 0 18px 40px rgba(242, 68, 55, 0.18);
+  }
+
+  .landing-plan-card:focus-visible {
+    outline: 2px solid var(--landing-cta);
+    outline-offset: 4px;
   }
 
   .landing-plan-card--highlighted {
     border: 2px solid var(--landing-cta);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
     transform: scale(1.05);
+  }
+
+  .landing-plan-card--highlighted:hover {
+    transform: scale(1.05) translateY(-6px);
+    box-shadow: 0 22px 48px rgba(242, 68, 55, 0.25);
   }
 
   .landing-plan-card__badge {
@@ -487,7 +507,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    margin-bottom: 2rem;
   }
 
   .landing-plan-card__feature {
@@ -554,7 +573,7 @@
   }
 
   .landing-about__tag {
-    font-size: 0.875rem;
+    font-size: 1.875rem;
     font-weight: 600;
     color: var(--landing-cta);
     letter-spacing: 0.1em;

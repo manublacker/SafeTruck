@@ -10,7 +10,7 @@ const features: { icon: LucideIcon; title: string; desc: string }[] = [
 ];
 
 const Features = () => (
-  <section className="landing-features">
+  <section id="que-ofrecemos" className="landing-features">
     <div className="landing-section__inner">
       <header className="landing-section__header">
         <h2 className="landing-section__title">Todo lo que necesitás en un solo lugar</h2>

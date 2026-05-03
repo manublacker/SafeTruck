@@ -2,15 +2,16 @@ import { CheckCircle2 } from "lucide-react";
 
 type Plan = {
   name: string;
+  slug: string;
   price: string;
   features: string[];
-  cta: string;
   highlighted?: boolean;
 };
 
 const plans: Plan[] = [
   {
     name: "Starter",
+    slug: "starter",
     price: "$29",
     features: [
       "Hasta 5 camiones",
@@ -19,10 +20,10 @@ const plans: Plan[] = [
       "Historial 7 días",
       "Soporte por email",
     ],
-    cta: "Empezar gratis",
   },
   {
     name: "Pro",
+    slug: "pro",
     price: "$79",
     features: [
       "Hasta 20 camiones",
@@ -32,11 +33,11 @@ const plans: Plan[] = [
       "Panel multi-usuario (3 admins)",
       "Soporte prioritario",
     ],
-    cta: "Elegir Pro",
     highlighted: true,
   },
   {
     name: "Enterprise",
+    slug: "enterprise",
     price: "$199",
     features: [
       "Camiones ilimitados",
@@ -47,7 +48,6 @@ const plans: Plan[] = [
       "Manager de cuenta dedicado",
       "SLA garantizado",
     ],
-    cta: "Contactar ventas",
   },
 ];
 
@@ -60,8 +60,10 @@ const Plans = () => (
       </header>
       <div className="landing-plans__grid">
         {plans.map((p) => (
-          <div
+          <a
             key={p.name}
+            href={`/register?plan=${p.slug}`}
+            aria-label={`Elegir plan ${p.name}`}
             className={`landing-plan-card${p.highlighted ? " landing-plan-card--highlighted" : ""}`}
           >
             {p.highlighted && (
@@ -80,12 +82,7 @@ const Plans = () => (
                 </li>
               ))}
             </ul>
-            <button
-              className={`landing-plan-card__cta${p.highlighted ? " landing-plan-card__cta--primary" : " landing-plan-card__cta--outline"}`}
-            >
-              {p.cta}
-            </button>
-          </div>
+          </a>
         ))}
       </div>
     </div>
