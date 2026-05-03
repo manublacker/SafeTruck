@@ -1,12 +1,3 @@
-/**
- * components/UserButton.tsx
- *
- * Botón fijo en la esquina superior derecha.
- * - Sin sesión: muestra "Iniciar sesión" → abre AuthModal.
- * - Con sesión: muestra las iniciales del usuario → despliega dropdown
- *   con nombre, email, empresa y lista de camiones + botón de cerrar sesión.
- */
-
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
