@@ -31,6 +31,11 @@ export interface RouteResponse {
   found: boolean;
   routeId: string | null;
   tripId: number | null;
+  alternativeRoute: {
+    path: RouteNode[];
+    distanceM: number;
+    estimatedDurationMin: number;
+  } | null;
   originLabel: string;
   destinationLabel: string;
   distanceM: number;

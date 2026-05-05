@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RouteRequest, RouteResponse, HealthResponse, SearchResult } from '@/types/route';
 
-const API_URL = 'https://safetruck-backend.icysky-af60cdde.canadacentral.azurecontainerapps.io';
+const API_URL = 'http://192.168.1.17:3000';
 
 const TOKEN_KEY = 'safetruck_token';
 
@@ -60,4 +60,46 @@ export async function searchStreets(query: string): Promise<SearchResult[]> {
   );
   const data = await handleResponse<{ results: SearchResult[] }>(res);
   return data.results ?? [];
+}
+
+// ── POST /api/reports ─────────────────────────────────────────
+// Registra un reporte cooperativo de multa o sin problemas.
+export async function submitReport(payload: {
+  report_type: 'multa' | 'sin_problemas';
+  lat: number;
+  lon: number;
+  trip_id?: number | null;
+  notes?: string;
+}): Promise<{ ok: boolean; arista_id: number }> {
+  const res = await fetch(`${API_URL}/api/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<{ ok: boolean; arista_id: number }>(res);
+}
+
+// ── POST /api/incidents ───────────────────────────────────────
+// Registra un incidente en vía (accidente, tráfico, obra, etc.)
+export async function submitIncident(payload: {
+  incident_type: 'accidente' | 'trafico' | 'obra' | 'control_policial' | 'objeto_en_via' | 'corte';
+  lat: number;
+  lon: number;
+  notes?: string;
+}): Promise<{ ok: boolean; incident_id: number }> {
+  const res = await fetch(`${API_URL}/api/incidents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<{ ok: boolean; incident_id: number }>(res);
+}
+
+// ── GET /api/incidents ────────────────────────────────────────
+// Obtiene todos los incidentes activos para mostrar en el mapa.
+export async function getIncidents(): Promise<{ incidents: any[] }> {
+  const res = await fetch(`${API_URL}/api/incidents`, {
+    headers: authHeaders(),
+  });
+  return handleResponse<{ incidents: any[] }>(res);
 }

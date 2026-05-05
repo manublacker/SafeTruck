@@ -103,7 +103,7 @@ BEGIN
         CASE WHEN p_tipo = 'multa' THEN 1 ELSE 0 END,
         CASE WHEN p_tipo = 'sin_problemas' THEN 1 ELSE 0 END,
         CASE
-            WHEN v_delta < -5  THEN 'bloqueada'
+            WHEN v_delta < -25  THEN 'bloqueada'
             WHEN v_delta > 10  THEN 'habilitada'
             ELSE 'desconocida'
         END,
@@ -116,7 +116,7 @@ BEGIN
         last_updated = NOW(),
         -- recalculo el status según el nuevo score acumulado
         status = CASE
-            WHEN (edge_trust_scores.score + v_delta) < -5  THEN 'bloqueada'
+            WHEN (edge_trust_scores.score + v_delta) < -25  THEN 'bloqueada'
             WHEN (edge_trust_scores.score + v_delta) > 10  THEN 'habilitada'
             ELSE 'desconocida'
         END;
@@ -128,3 +128,98 @@ $$;
 --    Se actualiza cada vez que el usuario abre la app.
 -- -----------------------------------------------------------------------------
 ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token TEXT;
+-- -----------------------------------------------------------------------------
+-- 6. INCIDENTES EN VÍA (eventos temporales estilo Waze)
+--    Accidentes, tráfico, obras, controles, objetos, cortes.
+--    Se vencen automáticamente después de expires_at.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS incidents (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         UUID REFERENCES users(id) ON DELETE SET NULL,
+    arista_id       INTEGER NOT NULL,
+    incident_type   TEXT NOT NULL CHECK (incident_type IN (
+                        'accidente',
+                        'trafico',
+                        'obra',
+                        'control_policial',
+                        'objeto_en_via',
+                        'corte'
+                    )),
+    lat             DOUBLE PRECISION NOT NULL,
+    lon             DOUBLE PRECISION NOT NULL,
+    notes           TEXT,
+    reported_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at      TIMESTAMPTZ NOT NULL,  -- calculado al insertar según el tipo
+    confirmed_count INTEGER NOT NULL DEFAULT 1,  -- otros usuarios que confirmaron
+    active          BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS incidents_arista_id_idx  ON incidents (arista_id);
+CREATE INDEX IF NOT EXISTS incidents_active_idx     ON incidents (active);
+CREATE INDEX IF NOT EXISTS incidents_expires_at_idx ON incidents (expires_at);
+
+-- -----------------------------------------------------------------------------
+-- 7. FUNCIÓN: reportar_incidente(arista_id, tipo, lat, lon)
+--    Inserta un incidente y calcula su expiración según el tipo.
+--
+--    Tiempos de expiración por tipo:
+--      accidente        → 3 horas
+--      trafico          → 1 hora
+--      obra             → 24 horas
+--      control_policial → 2 horas
+--      objeto_en_via    → 2 horas
+--      corte            → 6 horas
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION reportar_incidente(
+    p_arista_id     INTEGER,
+    p_tipo          TEXT,
+    p_lat           DOUBLE PRECISION,
+    p_lon           DOUBLE PRECISION,
+    p_user_id       UUID DEFAULT NULL,
+    p_notes         TEXT DEFAULT NULL
+)
+RETURNS BIGINT
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_duracion INTERVAL;
+    v_id       BIGINT;
+BEGIN
+    v_duracion := CASE p_tipo
+        WHEN 'accidente'        THEN INTERVAL '3 hours'
+        WHEN 'trafico'          THEN INTERVAL '1 hour'
+        WHEN 'obra'             THEN INTERVAL '24 hours'
+        WHEN 'control_policial' THEN INTERVAL '2 hours'
+        WHEN 'objeto_en_via'    THEN INTERVAL '2 hours'
+        WHEN 'corte'            THEN INTERVAL '6 hours'
+        ELSE                         INTERVAL '2 hours'
+    END;
+
+    INSERT INTO incidents (user_id, arista_id, incident_type, lat, lon, notes, expires_at)
+    VALUES (p_user_id, p_arista_id, p_tipo, p_lat, p_lon, p_notes, NOW() + v_duracion)
+    RETURNING id INTO v_id;
+
+    RETURN v_id;
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 8. FUNCIÓN: get_active_incidents()
+--    Devuelve todos los incidentes activos y no vencidos.
+--    El backend la llama al cargar el grafo para aplicar penalizaciones.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_active_incidents()
+RETURNS TABLE (
+    id              BIGINT,
+    arista_id       INTEGER,
+    incident_type   TEXT,
+    lat             DOUBLE PRECISION,
+    lon             DOUBLE PRECISION,
+    expires_at      TIMESTAMPTZ,
+    confirmed_count INTEGER
+)
+LANGUAGE sql STABLE AS $$
+    SELECT id, arista_id, incident_type, lat, lon, expires_at, confirmed_count
+    FROM incidents
+    WHERE active = TRUE
+      AND expires_at > NOW();
+$$;

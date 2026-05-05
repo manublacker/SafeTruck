@@ -109,12 +109,46 @@ for (const nodeId of Object.keys(grafo.adjacency)) {
   }
 }
 
-    const resultado = findTruckRoute(
-      grafo,
-      String(nodoOrigen.id),
-      String(nodoDestino.id),
-      vehicle
-    );
+// cargo los incidentes activos y los aplico al grafo en memoria
+const resIncidents = await pool.query("SELECT * FROM get_active_incidents()");
+console.log('Incidentes activos:', resIncidents.rows.length);
+console.log('Primeros incidentes:', JSON.stringify(resIncidents.rows.slice(0, 3)));
+const incidentMap: Record<number, { type: string; count: number }> = {};
+for (const row of resIncidents.rows) {
+  if (!incidentMap[row.arista_id]) {
+    incidentMap[row.arista_id] = { type: row.incident_type, count: 0 };
+  }
+  incidentMap[row.arista_id].count += row.confirmed_count;
+}
+
+// aplico penalización por incidentes a cada arista del grafo
+for (const nodeId of Object.keys(grafo.adjacency)) {
+  for (const edge of grafo.adjacency[nodeId]) {
+    const incident = incidentMap[edge.aristaId];
+    if (incident) {
+      edge.incidentType = incident.type;
+      edge.incidentCount = incident.count;
+    }
+  }
+}
+
+const resultado = findTruckRoute(
+  grafo,
+  String(nodoOrigen.id),
+  String(nodoDestino.id),
+  vehicle,
+  'normal'
+);
+console.log('Aristas en ruta principal:', resultado.path.slice(0, 5));
+console.log('incidentMap:', JSON.stringify(incidentMap));
+
+const resultadoAlternativo = findTruckRoute(
+  grafo,
+  String(nodoOrigen.id),
+  String(nodoDestino.id),
+  vehicle,
+  'alternative'
+);
 
     if (!resultado.found) {
       res.status(200).json({
@@ -131,46 +165,58 @@ for (const nodeId of Object.keys(grafo.adjacency)) {
       return;
     }
 
-    const path = await Promise.all(resultado.path.map(async (nodeId: string, index: number) => {
-      let label = "";
-      let geometry: Array<{lat: number, lon: number}> = [];
-      let aristaId: number | undefined = undefined;
+    async function buildPath(nodePath: string[], grafo: any) {
+      return Promise.all(nodePath.map(async (nodeId: string, index: number) => {
+        let label = "";
+        let geometry: Array<{lat: number, lon: number}> = [];
+        let aristaId: number | undefined = undefined;
     
-      if (index < resultado.path.length - 1) {
-        const siguienteId = resultado.path[index + 1];
-        const resArista = await pool.query(
-          `SELECT rv.nombre_buscable,
-              ST_AsGeoJSON(a.geom) AS geom_json,
-              a.source AS src,
-              a.id AS arista_id
-           FROM aristas a
-           JOIN red_vial rv ON rv.id = a.red_vial_id
-           WHERE (a.source = $1::integer AND a.target = $2::integer)
-              OR (a.source = $2::integer AND a.target = $1::integer)
-           ORDER BY a.costo ASC LIMIT 1`,
-          [nodeId, siguienteId]
-        );
-        if (resArista.rows.length > 0) {
-          label = resArista.rows[0].nombre_buscable ?? "";
-          aristaId = resArista.rows[0].arista_id ?? undefined;
-          if (resArista.rows[0].geom_json) {
-            const geoj = JSON.parse(resArista.rows[0].geom_json);
-            const coords = geoj.coordinates.map(([lon, lat]: [number, number]) => ({ lat, lon }));
-            const esInversa = resArista.rows[0].src !== Number(nodeId);
-            geometry = esInversa ? coords.reverse() : coords;
+        if (index < nodePath.length - 1) {
+          const siguienteId = nodePath[index + 1];
+          const resArista = await pool.query(
+            `SELECT rv.nombre_buscable,
+                ST_AsGeoJSON(a.geom) AS geom_json,
+                a.source AS src,
+                a.id AS arista_id
+             FROM aristas a
+             JOIN red_vial rv ON rv.id = a.red_vial_id
+             WHERE (a.source = $1::integer AND a.target = $2::integer)
+                OR (a.source = $2::integer AND a.target = $1::integer)
+             ORDER BY a.costo ASC LIMIT 1`,
+            [nodeId, siguienteId]
+          );
+          if (resArista.rows.length > 0) {
+            label = resArista.rows[0].nombre_buscable ?? "";
+            aristaId = resArista.rows[0].arista_id ?? undefined;
+            if (resArista.rows[0].geom_json) {
+              const geoj = JSON.parse(resArista.rows[0].geom_json);
+              const coords = geoj.coordinates.map(([lon, lat]: [number, number]) => ({ lat, lon }));
+              const esInversa = resArista.rows[0].src !== Number(nodeId);
+              geometry = esInversa ? coords.reverse() : coords;
+            }
           }
         }
-      }
     
-      return {
-        nodeId,
-        lat: grafo.nodes[nodeId].lat,
-        lon: grafo.nodes[nodeId].lon,
-        label,
-        geometry,
-        aristaId,      
-      };
-    }));
+        return {
+          nodeId,
+          lat: grafo.nodes[nodeId].lat,
+          lon: grafo.nodes[nodeId].lon,
+          label,
+          geometry,
+          aristaId,
+        };
+      }));
+    }
+    
+    const path = await buildPath(resultado.path, grafo);
+    console.log('Ruta principal:', resultado.path.length, 'nodos');
+console.log('Ruta alternativa:', resultadoAlternativo.path.length, 'nodos');
+console.log('Son iguales:', resultadoAlternativo.path.join(',') === resultado.path.join(','));
+
+const pathAlternativo = resultadoAlternativo.found && 
+  resultadoAlternativo.path.join(',') !== resultado.path.join(',')
+  ? await buildPath(resultadoAlternativo.path, grafo)
+  : null;
 
     let distanciaRealM = 0;
     for (let i = 0; i < resultado.path.length - 1; i++) {
@@ -186,6 +232,24 @@ for (const nodeId of Object.keys(grafo.adjacency)) {
         distanciaRealM += resArista.rows[0].costo;
       }
     }
+
+    // calculo la distancia de la ruta alternativa
+let distanciaAlternativaM = 0;
+if (pathAlternativo) {
+  for (let i = 0; i < resultadoAlternativo.path.length - 1; i++) {
+    const desde = resultadoAlternativo.path[i];
+    const hasta = resultadoAlternativo.path[i + 1];
+    const resArista = await pool.query(
+      `SELECT LEAST(costo, 10000) AS costo FROM aristas 
+       WHERE source = $1::integer AND target = $2::integer 
+       ORDER BY costo ASC LIMIT 1`,
+      [desde, hasta]
+    );
+    if (resArista.rows.length > 0) {
+      distanciaAlternativaM += resArista.rows[0].costo;
+    }
+  }
+}
 
     // Junto todos los puntos de geometría en un array plano para hacer snap-to-road
     const allGeometryPoints: Array<{lat: number, lon: number}> = [];
@@ -251,6 +315,11 @@ res.status(200).json({
   routeSummary: "Ruta calculada correctamente.",
   path,
   snappedPoints,
+  alternativeRoute: pathAlternativo ? {
+    path: pathAlternativo,
+    distanceM: Math.round(distanciaAlternativaM),
+    estimatedDurationMin: Math.round(distanciaAlternativaM / velocidadMs / 60),
+  } : null,
   warnings: [],
 });
 

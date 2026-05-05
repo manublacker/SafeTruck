@@ -31,6 +31,8 @@ interface GraphEdge {
   aristaId?: number;           // id de la arista en la tabla aristas (para historial cooperativo)
   trustScore?: number;         // score cooperativo de la arista (-inf a +inf)
   trustStatus?: string;        // 'habilitada' | 'bloqueada' | 'desconocida'
+  incidentType?: string;       // tipo de incidente activo en la arista
+  incidentCount?: number;      // cantidad de confirmaciones del incidente
 
   // Restricciones físicas / legales
   truckAllowed?: boolean;      // si false, el camión no puede circular
@@ -206,7 +208,7 @@ function isEdgeAllowed(edge: GraphEdge, vehicle: VehicleProfile): boolean {
     return true;
   }
   
-  function edgeCost(edge: GraphEdge, options: RoutingOptions = {}): number {
+  function edgeCost(edge: GraphEdge, options: RoutingOptions = {}, mode: 'normal' | 'alternative' = 'normal'): number {    
     let cost = edge.lengthM;
   
     // Si la calle no está habilitada para camiones, penalizo fuerte
@@ -229,6 +231,24 @@ function isEdgeAllowed(edge: GraphEdge, vehicle: VehicleProfile): boolean {
         // penalización proporcional al score negativo
         cost += Math.abs(edge.trustScore) * 500;
     }
+    // penalización por incidentes temporales
+    if (edge.incidentType) {
+        if (mode === 'alternative') {
+          // en modo alternativo, evita completamente los incidentes
+          return Infinity;
+        } else {
+          // en modo normal, solo advierte con una penalización leve
+          const basePenalty: Record<string, number> = {
+            accidente:        500,
+            corte:            2000,
+            trafico:          200,
+            obra:             300,
+            control_policial: 100,
+            objeto_en_via:    200,
+          };
+          cost += (basePenalty[edge.incidentType] ?? 200) * (edge.incidentCount ?? 1);
+        }
+      }
 
     return Math.max(cost, 1);
   }
@@ -260,8 +280,7 @@ function validateGraphInput(graph: Graph, origin: NodeId, destination: NodeId): 
 //found: indica si se encontró una ruta
 
 //Función que busca la ruta más corta entre el origen y el destino teniendo en cuenta el grafo y las restricciones del camión
-export function astar(graph: Graph, origin: NodeId, destination: NodeId, vehicle: VehicleProfile): AStarResult {
-    validateGraphInput(graph, origin, destination); //verifica que el grafo y los nodos existan
+export function astar(graph: Graph, origin: NodeId, destination: NodeId, vehicle: VehicleProfile, mode: 'normal' | 'alternative' = 'normal'): AStarResult {    validateGraphInput(graph, origin, destination); //verifica que el grafo y los nodos existan
 
     //si el origen y el destino son el mismo nodo, no hace falta buscar una ruta
     if (origin === destination) {
@@ -346,7 +365,7 @@ export function astar(graph: Graph, origin: NodeId, destination: NodeId, vehicle
                 continue;
             }
 
-            const tentativeG = gScore[currentNode] + edgeCost(edge); //calcula la nueva distancia acumulada usando la longitud de la arista
+            const tentativeG = gScore[currentNode] + edgeCost(edge, {}, mode);//calcula la nueva distancia acumulada usando la longitud de la arista
 
             //si encontró un camino más corto hacia el vecino, actualiza los datos
             if (tentativeG < gScore[neighbor]) {
@@ -537,12 +556,13 @@ function reconstructRoute(prev: Record<NodeId, NodeId | null>, origin: NodeId, d
 //Esta función puede llegar a ser para mas adelante (la que esta comentada) que es la misma pero recibiendo un parámetro mas
 //function findTruckRoute(graph: Graph, origin: NodeId, destination: NodeId, vehicle: VehicleProfile, //options: RoutingOptions = {}
 export function findTruckRoute(
-  graph: Graph,
-  origin: NodeId,
-  destination: NodeId,
-  vehicle: VehicleProfile
-): { path: NodeId[]; distance: number; found: boolean } {
-    const result = astar(graph, origin, destination, vehicle);
+    graph: Graph,
+    origin: NodeId,
+    destination: NodeId,
+    vehicle: VehicleProfile,
+    mode: 'normal' | 'alternative' = 'normal'
+  ): { path: NodeId[]; distance: number; found: boolean } {
+    const result = astar(graph, origin, destination, vehicle, mode);    
     if (!result.found) {
         return {
         path: [],

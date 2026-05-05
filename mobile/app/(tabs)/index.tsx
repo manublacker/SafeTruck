@@ -25,7 +25,7 @@ import { searchLocations, geocodeLocation, type GeoSuggestion } from '@/services
 import type { RouteRequest, RouteResponse, RouteNode } from '@/types/route';
 import { Palette, type ThemeTokens } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-
+import { submitReport, submitIncident, getIncidents } from '@/services/api';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT;
 // translateY del sheet (0 = pegado arriba). Tope superior ≈ 25% libre arriba (mapa visible + pill camión).
@@ -187,9 +187,23 @@ export default function MapScreen() {
   const [vehicle, setVehicle] = useState<VehicleConfig>(defaultVehicle);
 
   const [routeResponse, setRouteResponse] = useState<RouteResponse | null>(null);
+  const [tripId, setTripId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [altRouteCoords, setAltRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+const [selectedRoute, setSelectedRoute] = useState<'main' | 'alternative'>('main');
   const [isNavigating, setIsNavigating] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportCoord, setReportCoord] = useState<{latitude: number, longitude: number} | null>(null);
+  const [reportType, setReportType] = useState<'multa' | 'sin_problemas' | null>(null);
+  const [reportNotes, setReportNotes] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [incidents, setIncidents] = useState<any[]>([]);
+  const [incidentModalOpen, setIncidentModalOpen] = useState(false);
+  const [incidentType, setIncidentType] = useState<string | null>(null);
+  const [incidentCoord, setIncidentCoord] = useState<{latitude: number, longitude: number} | null>(null);
+  const [incidentNotes, setIncidentNotes] = useState('');
+  const [incidentLoading, setIncidentLoading] = useState(false);  
   const [userHeading, setUserHeading] = useState(0);
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
 
@@ -211,6 +225,19 @@ export default function MapScreen() {
       } catch { /* sin GPS, queda editable */ }
     })();
   }, []);
+
+  // cargo los incidentes activos al montar la pantalla y los refresco cada 2 minutos
+useEffect(() => {
+  async function loadIncidents() {
+    try {
+      const data = await getIncidents();
+      setIncidents(data.incidents);
+    } catch { /* sin conexión, no bloqueo */ }
+  }
+  loadIncidents();
+  const interval = setInterval(loadIncidents, 2 * 60 * 1000);
+  return () => clearInterval(interval);
+}, []);
   
   useEffect(() => {
     if (!isNavigating) return;
@@ -314,12 +341,23 @@ export default function MapScreen() {
       };
       const response = await calculateRoute(payload);
       setRouteResponse(response);
+      setTripId(response.tripId ?? null);
       if (response.found && response.path.length > 0) {
         const coords = (response.snappedPoints && response.snappedPoints.length > 0
           ? response.snappedPoints
           : response.path.flatMap((n: any) => n.geometry?.length ? n.geometry : [{ lat: n.lat, lon: n.lon }])
         ).map((p: any) => ({ latitude: p.lat, longitude: p.lon }));
         setRouteCoords(coords);
+        // proceso la ruta alternativa si existe
+if (response.alternativeRoute?.path) {
+  const altCoords = response.alternativeRoute.path
+    .flatMap((n: any) => n.geometry?.length ? n.geometry : [{ lat: n.lat, lon: n.lon }])
+    .map((p: any) => ({ latitude: p.lat, longitude: p.lon }));
+  setAltRouteCoords(altCoords);
+} else {
+  setAltRouteCoords([]);
+}
+setSelectedRoute('main');
         mapRef.current?.fitToCoordinates(coords, {
           edgePadding: { top: 120, right: 60, bottom: (SHEET_HEIGHT - SNAP_MID) + 40, left: 60 },
           animated: true,
@@ -338,6 +376,60 @@ export default function MapScreen() {
     () => (routeResponse?.found ? buildInstrucciones(routeResponse.path) : []),
     [routeResponse]
   );
+
+  async function handleSubmitReport() {
+    if (!reportCoord || !reportType) {
+      Alert.alert('Falta información', 'Tocá el mapa para indicar la calle y elegí el tipo de reporte.');
+      return;
+    }
+    setReportLoading(true);
+    try {
+      await submitReport({
+        report_type: reportType,
+        lat: reportCoord.latitude,
+        lon: reportCoord.longitude,
+        trip_id: tripId,
+        notes: reportNotes || undefined,
+      });
+      setReportModalOpen(false);
+      setReportCoord(null);
+      setReportType(null);
+      setReportNotes('');
+      Alert.alert('¡Gracias!', 'Tu reporte fue registrado y ayuda a otros camioneros.');
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo enviar el reporte. Intentá de nuevo.');
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
+  async function handleSubmitIncident() {
+    if (!incidentCoord || !incidentType) {
+      Alert.alert('Falta información', 'Tocá el mapa para indicar el lugar y elegí el tipo de incidente.');
+      return;
+    }
+    setIncidentLoading(true);
+    try {
+      await submitIncident({
+        incident_type: incidentType as any,
+        lat: incidentCoord.latitude,
+        lon: incidentCoord.longitude,
+        notes: incidentNotes || undefined,
+      });
+      // refresco los incidentes del mapa
+      const data = await getIncidents();
+      setIncidents(data.incidents);
+      setIncidentModalOpen(false);
+      setIncidentCoord(null);
+      setIncidentType(null);
+      setIncidentNotes('');
+      Alert.alert('¡Gracias!', 'El incidente fue reportado. Otros camioneros ya pueden verlo.');
+    } catch {
+      Alert.alert('Error', 'No se pudo enviar el reporte. Intentá de nuevo.');
+    } finally {
+      setIncidentLoading(false);
+    }
+  }
 
   const recenter = () => {
     if (routeCoords.length > 0) {
@@ -378,15 +470,49 @@ export default function MapScreen() {
         {dest.selected && (
           <Marker coordinate={{ latitude: dest.selected.lat, longitude: dest.selected.lon }} />
         )}
-        {routeCoords.length > 0 && (
-          <Polyline
-            coordinates={routeCoords}
-            strokeColor={tokens.brand}
-            strokeWidth={6}
-            lineCap="round"
-            lineJoin="round"
-          />
-        )}
+        {/* Ruta alternativa — se muestra en gris detrás */}
+{altRouteCoords.length > 0 && (
+  <Polyline
+    coordinates={altRouteCoords}
+    strokeColor={selectedRoute === 'alternative' ? tokens.brand : '#888888'}
+    strokeWidth={selectedRoute === 'alternative' ? 6 : 4}
+    lineCap="round"
+    lineJoin="round"
+    tappable
+    onPress={() => setSelectedRoute('alternative')}
+  />
+)}
+{/* Ruta principal */}
+{routeCoords.length > 0 && (
+  <Polyline
+    coordinates={routeCoords}
+    strokeColor={selectedRoute === 'main' ? tokens.brand : '#888888'}
+    strokeWidth={selectedRoute === 'main' ? 6 : 4}
+    lineCap="round"
+    lineJoin="round"
+    tappable
+    onPress={() => setSelectedRoute('main')}
+  />
+)}
+        {/* Íconos de incidentes activos en el mapa */}
+      {incidents.filter((inc) => inc.lat && inc.lon).map((inc) => (
+        <Marker
+          key={inc.id}
+          coordinate={{ latitude: inc.lat, longitude: inc.lon }}
+          anchor={{ x: 0.5, y: 0.5 }}
+        >
+          <View style={styles.incidentMarker}>
+            <Text style={styles.incidentMarkerIcon}>
+              {inc.incident_type === 'accidente'        ? '🚨'
+              : inc.incident_type === 'trafico'         ? '🚦'
+              : inc.incident_type === 'obra'            ? '🚧'
+              : inc.incident_type === 'control_policial'? '👮'
+              : inc.incident_type === 'objeto_en_via'   ? '⚠️'
+              : '🚫'}
+            </Text>
+          </View>
+        </Marker>
+      ))}
       </MapView>
 
       {/* Top: pill camión activo (única) */}
@@ -409,7 +535,16 @@ export default function MapScreen() {
           <Ionicons name="chevron-forward" size={16} color={tokens.textOnDark} />
         </TouchableOpacity>
       </View>
-
+      {/* Botón de reporte de incidente — siempre visible */}
+      <Animated.View style={[styles.fabIncident, { opacity: fabOpacity }]} pointerEvents="box-none">
+        <TouchableOpacity
+          onPress={() => setIncidentModalOpen(true)}
+          activeOpacity={0.85}
+          style={styles.fabIncidentBtn}
+        >
+          <Ionicons name="warning" size={20} color={Palette.white} />
+        </TouchableOpacity>
+      </Animated.View>
       {/* Recentrar (único FAB) — se oculta cuando el sheet sube */}
       <Animated.View
         style={[styles.fabRecenter, { opacity: fabOpacity }]}
@@ -494,18 +629,46 @@ export default function MapScreen() {
                 RUTA SUGERIDA  ·  <Text style={styles.routeEyebrowSoft}>APTA PARA CAMIÓN</Text>
               </Text>
               {routeResponse?.found ? (
-                <>
-                  <Text style={styles.routeBig}>
-                    <Text style={styles.routeBigNum}>{routeResponse.estimatedDurationMin}</Text>
-                    <Text style={styles.routeBigUnit}> min</Text>
-                    <Text style={styles.routeBigSep}>  ·  </Text>
-                    <Text style={styles.routeBigDist}>{formatKm(routeResponse.distanceM)}</Text>
-                  </Text>
-                  <Text style={styles.routeSub}>
-                    Llegás <Text style={styles.routeSubBold}>{computeETA(routeResponse.estimatedDurationMin)}</Text>
-                    {' '}· velocidad camión
-                  </Text>
-                </>
+  <>
+    <Text style={styles.routeBig}>
+      <Text style={styles.routeBigNum}>
+        {selectedRoute === 'main' 
+          ? routeResponse.estimatedDurationMin 
+          : routeResponse.alternativeRoute?.estimatedDurationMin}
+      </Text>
+      <Text style={styles.routeBigUnit}> min</Text>
+      <Text style={styles.routeBigSep}>  ·  </Text>
+      <Text style={styles.routeBigDist}>
+        {formatKm(selectedRoute === 'main' 
+          ? routeResponse.distanceM 
+          : routeResponse.alternativeRoute?.distanceM ?? 0)}
+      </Text>
+    </Text>
+    <Text style={styles.routeSub}>
+      Llegás <Text style={styles.routeSubBold}>
+        {computeETA(selectedRoute === 'main' 
+          ? routeResponse.estimatedDurationMin 
+          : routeResponse.alternativeRoute?.estimatedDurationMin ?? 0)}
+      </Text>
+      {' '}· velocidad camión
+    </Text>
+    {altRouteCoords.length > 0 && (
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+        <TouchableOpacity
+          onPress={() => setSelectedRoute('main')}
+          style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: selectedRoute === 'main' ? tokens.brand : tokens.surfaceAlt }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: '700', color: selectedRoute === 'main' ? '#fff' : tokens.textSecond }}>Más rápida</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setSelectedRoute('alternative')}
+          style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: selectedRoute === 'alternative' ? tokens.brand : tokens.surfaceAlt }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: '700', color: selectedRoute === 'alternative' ? '#fff' : tokens.textSecond }}>Sin incidentes</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+  </>
               ) : (
                 <>
                   <Text style={styles.routeBig}>
@@ -546,6 +709,18 @@ export default function MapScreen() {
   )}
 </TouchableOpacity>
           </View>
+
+          {/* Botón de reporte cooperativo */}
+          {routeResponse?.found && (
+            <TouchableOpacity
+              style={[styles.reportBtn]}
+              onPress={() => setReportModalOpen(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="warning-outline" size={16} color={tokens.warning} />
+              <Text style={styles.reportBtnText}>Reportar problema en esta ruta</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Warnings reales del backend */}
           {routeResponse?.found && (routeResponse.warnings?.length ?? 0) > 0 && (
@@ -630,6 +805,171 @@ export default function MapScreen() {
           )}
         </ScrollView>
       </Animated.View>
+
+{/* Modal de reporte de incidente */}
+<Modal visible={incidentModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setIncidentModalOpen(false)}>
+  <KeyboardAvoidingView style={{ flex: 1, backgroundColor: tokens.surface }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.modalHeader}>
+      <TouchableOpacity onPress={() => setIncidentModalOpen(false)}>
+        <Text style={styles.modalCancel}>Cancelar</Text>
+      </TouchableOpacity>
+      <Text style={styles.modalTitle}>Reportar incidente</Text>
+      <TouchableOpacity onPress={handleSubmitIncident} disabled={incidentLoading}>
+        {incidentLoading
+          ? <ActivityIndicator color={tokens.brand} />
+          : <Text style={styles.modalSave}>Enviar</Text>
+        }
+      </TouchableOpacity>
+    </View>
+
+    <ScrollView contentContainerStyle={{ padding: tokens.spaceXl, gap: tokens.spaceLg }}>
+      <Text style={{ fontSize: 14, color: tokens.textSecond, lineHeight: 20 }}>
+        Tocá el mapa para indicar dónde está el incidente.
+      </Text>
+
+      {/* Mapa para seleccionar ubicación */}
+      <View style={{ height: 220, borderRadius: tokens.radiusMd, overflow: 'hidden', marginBottom: tokens.spaceLg }}>
+        <MapView
+          style={StyleSheet.absoluteFillObject}
+          initialRegion={
+            routeCoords.length > 0
+              ? { latitude: routeCoords[0].latitude, longitude: routeCoords[0].longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }
+              : BA_REGION
+          }
+          onPress={(e) => setIncidentCoord(e.nativeEvent.coordinate)}
+        >
+          {routeCoords.length > 0 && (
+            <Polyline coordinates={routeCoords} strokeColor={tokens.brand} strokeWidth={4} />
+          )}
+          {incidentCoord && (
+            <Marker coordinate={incidentCoord}>
+              <View style={{ backgroundColor: tokens.warning, width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Palette.white }} />
+            </Marker>
+          )}
+        </MapView>
+      </View>
+
+      {/* Tipo de incidente */}
+      <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecond, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
+        Tipo de incidente
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: tokens.spaceLg }}>
+        {[
+          { type: 'accidente',         icon: '🚨', label: 'Accidente' },
+          { type: 'trafico',           icon: '🚦', label: 'Tráfico' },
+          { type: 'obra',              icon: '🚧', label: 'Obra' },
+          { type: 'control_policial',  icon: '👮', label: 'Control' },
+          { type: 'objeto_en_via',     icon: '⚠️', label: 'Objeto' },
+          { type: 'corte',             icon: '🚫', label: 'Corte' },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.type}
+            style={{ width: '30%', padding: 12, borderRadius: tokens.radiusMd, borderWidth: 2, borderColor: incidentType === item.type ? tokens.warning : tokens.border, alignItems: 'center', gap: 4 }}
+            onPress={() => setIncidentType(item.type)}
+          >
+            <Text style={{ fontSize: 24 }}>{item.icon}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: incidentType === item.type ? tokens.warning : tokens.textMuted }}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Comentario opcional */}
+      <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecond, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
+        Comentario (opcional)
+      </Text>
+      <TextInput
+        style={{ backgroundColor: tokens.surfaceAlt, borderRadius: tokens.radiusMd, padding: 14, fontSize: 14, color: tokens.textPrimary, minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: tokens.border }}
+        value={incidentNotes}
+        onChangeText={setIncidentNotes}
+        placeholder="Ej: accidente en el carril derecho"
+        placeholderTextColor={tokens.textMuted}
+        multiline
+      />
+    </ScrollView>
+  </KeyboardAvoidingView>
+</Modal>
+
+      {/* Modal de reporte cooperativo */}
+<Modal visible={reportModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setReportModalOpen(false)}>
+  <KeyboardAvoidingView style={{ flex: 1, backgroundColor: tokens.surface }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    {/* Header */}
+    <View style={styles.modalHeader}>
+      <TouchableOpacity onPress={() => setReportModalOpen(false)}>
+        <Text style={styles.modalCancel}>Cancelar</Text>
+      </TouchableOpacity>
+      <Text style={styles.modalTitle}>Reportar problema</Text>
+      <TouchableOpacity onPress={handleSubmitReport} disabled={reportLoading}>
+        {reportLoading
+          ? <ActivityIndicator color={tokens.brand} />
+          : <Text style={styles.modalSave}>Enviar</Text>
+        }
+      </TouchableOpacity>
+    </View>
+
+    <ScrollView contentContainerStyle={{ padding: tokens.spaceXl, gap: tokens.spaceLg }}>
+      {/* Instrucción */}
+      <Text style={{ fontSize: 14, color: tokens.textSecond, lineHeight: 20 }}>
+        Tocá el mapa para indicar en qué calle tuviste el problema.
+      </Text>
+
+      {/* Mapa para seleccionar la calle */}
+      <View style={{ height: 220, borderRadius: tokens.radiusMd, overflow: 'hidden', marginBottom: tokens.spaceLg }}>
+        <MapView
+          style={StyleSheet.absoluteFillObject}
+          initialRegion={
+            routeCoords.length > 0
+              ? { latitude: routeCoords[0].latitude, longitude: routeCoords[0].longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }
+              : BA_REGION
+          }
+          onPress={(e) => setReportCoord(e.nativeEvent.coordinate)}
+        >
+          {routeCoords.length > 0 && (
+            <Polyline coordinates={routeCoords} strokeColor={tokens.brand} strokeWidth={4} />
+          )}
+          {reportCoord && (
+            <Marker coordinate={reportCoord}>
+              <View style={{ backgroundColor: tokens.warning, width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Palette.white }} />
+            </Marker>
+          )}
+        </MapView>
+      </View>
+
+      {/* Tipo de reporte */}
+      <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecond, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
+        ¿Qué pasó?
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 12, marginBottom: tokens.spaceLg }}>
+        <TouchableOpacity
+          style={{ flex: 1, padding: 14, borderRadius: tokens.radiusMd, borderWidth: 2, borderColor: reportType === 'multa' ? tokens.warning : tokens.border, alignItems: 'center', gap: 6 }}
+          onPress={() => setReportType('multa')}
+        >
+          <Ionicons name="alert-circle" size={24} color={reportType === 'multa' ? tokens.warning : tokens.textMuted} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: reportType === 'multa' ? tokens.warning : tokens.textMuted }}>Me multaron</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{ flex: 1, padding: 14, borderRadius: tokens.radiusMd, borderWidth: 2, borderColor: reportType === 'sin_problemas' ? tokens.brand : tokens.border, alignItems: 'center', gap: 6 }}
+          onPress={() => setReportType('sin_problemas')}
+        >
+          <Ionicons name="checkmark-circle" size={24} color={reportType === 'sin_problemas' ? tokens.brand : tokens.textMuted} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: reportType === 'sin_problemas' ? tokens.brand : tokens.textMuted }}>Sin problemas</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Comentario opcional */}
+      <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecond, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
+        Comentario (opcional)
+      </Text>
+      <TextInput
+        style={{ backgroundColor: tokens.surfaceAlt, borderRadius: tokens.radiusMd, padding: 14, fontSize: 14, color: tokens.textPrimary, minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: tokens.border }}
+        value={reportNotes}
+        onChangeText={setReportNotes}
+        placeholder="Ej: me detuvieron en la esquina con Av. Corrientes"
+        placeholderTextColor={tokens.textMuted}
+        multiline
+      />
+    </ScrollView>
+  </KeyboardAvoidingView>
+</Modal>
 
       {/* Modal vehículo */}
       <VehicleModal
@@ -980,6 +1320,49 @@ function makeStyles(tokens: ThemeTokens) {
     borderWidth: 1, borderColor: tokens.border,
   },
   switchLabel: { fontSize: 14, color: tokens.textPrimary, fontWeight: '600' },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: tokens.warningSoft,
+    borderRadius: tokens.radiusMd,
+    padding: 14,
+    marginBottom: tokens.spaceLg,
+  },
+  reportBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: tokens.warning,
+  },
+  incidentMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: tokens.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: tokens.warning,
+    ...tokens.shadow.fab,
+  },
+  incidentMarkerIcon: {
+    fontSize: 18,
+  },
+  fabIncident: {
+    position: 'absolute',
+    right: tokens.spaceLg,
+    bottom: (SHEET_HEIGHT - SNAP_PEEK) + 72,
+    zIndex: 9,
+  },
+  fabIncidentBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: tokens.warning,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...tokens.shadow.fab,
+  },
   });
 }
 
