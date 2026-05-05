@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RouteRequest, RouteResponse, HealthResponse, SearchResult } from '@/types/route';
 
-const API_URL = 'http://192.168.1.17:3000';
+const API_URL = 'https://safetruck-backend-production.up.railway.app';
 
 const TOKEN_KEY = 'safetruck_token';
 
