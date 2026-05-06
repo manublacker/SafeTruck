@@ -23,7 +23,7 @@ psql -d safetruck -f database/sql/01_schema.sql
 2. Importar GeoJSONs:
 
 ```bash
-npx ts-node database/importar.ts
+npx ts-node database/import/importar.ts --all
 ```
 
 3. Construir topologia y restricciones:
@@ -33,6 +33,49 @@ psql -d safetruck -f database/sql/02_topology.sql
 psql -d safetruck -f database/sql/03_restrictions.sql
 psql -d safetruck -f database/sql/04_backend_views.sql
 ```
+
+## Sumar un partido nuevo (conurbano)
+
+Para incorporar un partido que todavía no está en `red_vial` (ej: La Matanza, Tigre, San Isidro), el flujo es:
+
+```bash
+# 1. Bajar la red vial OSM (filtrada por jerarquía: motorway, trunk, primary,
+#    secondary, tertiary, residential). Genera database/data/base/red-vial-<slug>.geojson
+./venv/bin/python scripts/descargar_red_vial_partido.py --partido "La Matanza"
+
+# 2. Resolver tramos habilitados contra esa red OSM. Genera
+#    database/data/restricciones/tramos-por-nombre-<slug>.json + reporte
+./venv/bin/python scripts/geocodificar_municipio.py \
+    --input database/data/restricciones/la_matanza_truck_network.json \
+    --partido "La Matanza"
+
+# 3. Cargar a la base (Supabase remota o local)
+export DATABASE_URL="postgresql://postgres:...@db.xxx.supabase.co:5432/postgres"
+npx ts-node database/import/importar.ts --partido la-matanza
+
+# 4. Regenerar topología (incluye las aristas del partido nuevo)
+psql "$DATABASE_URL" -f database/sql/02_topology.sql
+
+# 5. Refrescar camion_permitido sólo para ese partido
+psql "$DATABASE_URL" -v partido="'la_matanza'" -f database/sql/10_refresh_restricciones.sql
+```
+
+> Antes de ejecutar el paso 3, agregá el partido al diccionario `PARTIDOS_NUEVOS` en `database/import/importar.ts`.
+
+> El paso 4 (`02_topology.sql`) **inserta sin truncar**. Si la tabla `aristas` ya tenía datos de CABA y Lanús, vas a duplicar. Para regenerar limpio:
+> ```sql
+> TRUNCATE aristas, nodos RESTART IDENTITY CASCADE;
+> ```
+> y después correr `02_topology.sql` + `03_restrictions.sql` + `06_importar_red_camiones_kml.sql` + `10_refresh_restricciones.sql` por cada partido.
+
+### Estrategia de matching de tramos
+
+A diferencia de Lanús (que usaba `georef.ar/intersecciones`, **endpoint deprecado en 2026**), los partidos nuevos resuelven la geometría de cada tramo directamente contra `red_vial`. El script `geocodificar_municipio.py` valida que cada tramo del JSON municipal tenga match en OSM y genera dos estrategias:
+
+- **Match por `ref` OSM** (más confiable para rutas): `RN3`, `RP4`, `RP21`, etc. Detecta automáticamente "Ruta Nacional 3", "Ruta Provincial 21", o alias entre paréntesis como `(RP4)`.
+- **Match por `nombre` con ILIKE**: usa todas las palabras distintivas del nombre en orden. Si no hay match estricto, cae a "primera palabra de 5+ letras" para tolerar typos (Riccheri vs Ricchieri).
+
+Tramos sin match quedan en `database/data/restricciones/reporte-<slug>.txt` para revisión manual.
 
 ## Tablas principales
 
