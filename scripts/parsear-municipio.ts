@@ -1,33 +1,25 @@
 /*******************************************************
  * parsear-municipio.ts
  *
- * Lee un PDF de red de tránsito pesado de un municipio,
- * extrae las calles habilitadas usando la API de Anthropic,
- * y las inserta en la tabla red_camiones de PostgreSQL.
+ * Lee un JSON estándar de red de tránsito pesado y lo
+ * inserta en la tabla red_camiones de PostgreSQL buscando
+ * la geometría en red_vial por nombre de calle.
  *
- * Uso:
- *   npx ts-node scripts/parsear-municipio.ts \
- *     --pdf="database/data/restricciones/LANUS - Red de Transito Pesado.pdf" \
- *     --municipio=lanus
+ * Uso (un municipio):
+ *   npx ts-node scripts/parsear-municipio.ts --municipio=lomas_de_zamora
  *
- * Requisitos:
- *   - ANTHROPIC_API_KEY en el archivo .env de backend/
- *   - PostgreSQL corriendo con la base safetruck
- *   - Haber corrido importar.ts antes (para tener red_vial cargada)
+ * Uso (todos los municipios en database/data/restricciones/):
+ *   npx ts-node scripts/parsear-municipio.ts --all
  *
- * Después de correr este script, volver a ejecutar:
+ * Después de correr este script ejecutar:
  *   psql -d safetruck -f database/sql/03_restrictions.sql
  *******************************************************/
 
 import fs from "fs";
 import path from "path";
 import { Client } from "pg";
-import Anthropic from "@anthropic-ai/sdk";
 import "dotenv/config";
 
-// ---------------------------------------------------------------------------
-// Configuración de conexión a la base de datos
-// ---------------------------------------------------------------------------
 const DB_CONFIG = {
   host: "localhost",
   port: 5432,
@@ -36,86 +28,90 @@ const DB_CONFIG = {
   password: "postgres",
 };
 
+const RESTRICCIONES_DIR = path.resolve("database/data/restricciones");
+
 // ---------------------------------------------------------------------------
-// Tipos esperados en la respuesta de la IA
+// Tipos del formato estándar
 // ---------------------------------------------------------------------------
-interface CalleHabilitada {
+interface ViaHabilitada {
   nombre: string;
-  desde_calle: string | null;
-  hasta_calle: string | null;
-  tipo: string | null;           // "primaria" | "secundaria" | null
-  restricciones: string | null;  // texto libre con restricciones adicionales
+  desde: string | null;
+  hasta: string | null;
+  jerarquia: string | null;
+  notas: string | null;
 }
 
-interface RespuestaIA {
-  municipio: string;
-  calles: CalleHabilitada[];
+interface AlertaAltura {
+  ubicacion: string;
+  altura_max_m: number;
+}
+
+interface MunicipioJSON {
+  partido: string;
+  provincia: string;
+  fuente_legal: string | null;
+  config: {
+    limite_peso_kg: number | null;
+    altura_max_m: number | null;
+    politica_ruteo: string | null;
+  };
+  vias_habilitadas: ViaHabilitada[];
+  alertas_altura: AlertaAltura[];
 }
 
 // ---------------------------------------------------------------------------
-// Parsea los argumentos de línea de comandos
-// Busca --pdf=... y --municipio=...
+// Parsea argumentos CLI
 // ---------------------------------------------------------------------------
-function parsearArgs(): { pdf: string; municipio: string } {
+function parsearArgs(): { municipio: string | null; all: boolean } {
   const args = process.argv.slice(2);
-  const pdfArg = args.find((a) => a.startsWith("--pdf="));
+  const all = args.includes("--all");
   const municipioArg = args.find((a) => a.startsWith("--municipio="));
-
-  if (!pdfArg || !municipioArg) {
-    console.error(
-      "Uso: npx ts-node scripts/parsear-municipio.ts --pdf=<ruta> --municipio=<nombre>"
-    );
-    process.exit(1);
-  }
-
   return {
-    pdf: pdfArg.replace("--pdf=", "").replace(/^"|"$/g, ""),
-    municipio: municipioArg.replace("--municipio=", "").toLowerCase(),
+    all,
+    municipio: municipioArg ? municipioArg.replace("--municipio=", "") : null,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Llama a la API de Anthropic con el PDF y extrae las calles habilitadas
+// Lee el JSON estándar del municipio
 // ---------------------------------------------------------------------------
-// Lee el JSON ya parseado en vez de llamar a la IA
-function leerJSONParsado(municipio: string): RespuestaIA {
-  const ruta = path.resolve(
-    `database/data/restricciones/${municipio}-parsed.json`
-  );
-  const contenido = fs.readFileSync(ruta, "utf-8");
-  return JSON.parse(contenido) as RespuestaIA;
+function leerJSON(municipio: string): MunicipioJSON {
+  const ruta = path.join(RESTRICCIONES_DIR, `${municipio}.json`);
+  if (!fs.existsSync(ruta)) {
+    throw new Error(`No se encontró el archivo: ${ruta}`);
+  }
+  return JSON.parse(fs.readFileSync(ruta, "utf-8")) as MunicipioJSON;
 }
 
 // ---------------------------------------------------------------------------
-// Busca la geometría de una calle en red_vial usando intersección espacial
-// Devuelve la geometría WKT del tramo más representativo encontrado
+// Busca la geometría de una calle en red_vial por nombre
 // ---------------------------------------------------------------------------
 async function buscarGeometria(
   dbClient: Client,
   nombre: string,
-  municipio: string
+  dataset: string
 ): Promise<string | null> {
-  // Extraigo las palabras significativas del nombre (saco "Avenida", "General", "Coronel", etc.)
-  const stopWords = ["avenida", "av", "general", "gral", "coronel", "cnel",
-    "presidente", "pte", "doctor", "dr", "intendente", "presbítero", "santo", "santa"];
-  
-  const palabras = nombre.toLowerCase().split(/\s+/)
-    .filter(p => p.length > 3 && !stopWords.includes(p));
+  const stopWords = [
+    "avenida", "av", "general", "gral", "coronel", "cnel",
+    "presidente", "pte", "doctor", "dr", "intendente", "presbítero",
+    "santo", "santa", "camino", "ruta", "autopista",
+  ];
+
+  const palabras = nombre
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((p) => p.length > 3 && !stopWords.includes(p));
 
   if (palabras.length === 0) return null;
 
-  // Busco con la palabra más distintiva (la más larga)
   const clave = palabras.sort((a, b) => b.length - a.length)[0];
 
   const result = await dbClient.query(
-    `
-    SELECT ST_AsText(ST_GeometryN(ST_LineMerge(ST_Collect(geom)), 1)) AS geom_wkt
-    FROM red_vial
-    WHERE dataset_origen = $1
-      AND nombre ILIKE $2
-    LIMIT 1
-    `,
-    [municipio, `%${clave}%`]
+    `SELECT ST_AsText(ST_GeometryN(ST_LineMerge(ST_Collect(geom)), 1)) AS geom_wkt
+     FROM red_vial
+     WHERE dataset_origen = $1 AND nombre ILIKE $2
+     LIMIT 1`,
+    [dataset, `%${clave}%`]
   );
 
   if (result.rows.length === 0 || !result.rows[0].geom_wkt) return null;
@@ -123,63 +119,61 @@ async function buscarGeometria(
 }
 
 // ---------------------------------------------------------------------------
-// Inserta las calles extraídas en red_camiones
+// Inserta las vías del municipio en red_camiones
 // ---------------------------------------------------------------------------
-async function insertarEnRedCamiones(
+async function procesarMunicipio(
   dbClient: Client,
-  datos: RespuestaIA,
   municipio: string
 ): Promise<void> {
-  console.log(`\nInsertando ${datos.calles.length} calles en red_camiones...`);
+  console.log(`\n── ${municipio} ──`);
+
+  const datos = leerJSON(municipio);
+  const dataset = municipio; // dataset_origen en red_vial = slug del municipio
 
   let insertados = 0;
   let sinGeometria = 0;
 
-  for (const calle of datos.calles) {
-    // Busco la geometría en red_vial
-    const geomWkt = await buscarGeometria(dbClient, calle.nombre, municipio);
+  for (const via of datos.vias_habilitadas) {
+    const geomWkt = await buscarGeometria(dbClient, via.nombre, dataset);
 
     if (!geomWkt) {
-      console.warn(`  ⚠ Sin geometría: ${calle.nombre}`);
+      console.warn(`  ⚠ Sin geometría: ${via.nombre}`);
       sinGeometria++;
       continue;
     }
 
     await dbClient.query(
-      `
-      INSERT INTO red_camiones (
-        dataset_origen, nombre, desde_calle, hasta_calle,
-        descripcion, metadata, geom
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6,
-        ST_GeomFromText($7, 4326)
-      )
-      `,
+      `INSERT INTO red_camiones (
+         dataset_origen, nombre, desde_calle, hasta_calle,
+         descripcion, metadata, geom
+       ) VALUES ($1, $2, $3, $4, $5, $6, ST_GeomFromText($7, 4326))
+       ON CONFLICT DO NOTHING`,
       [
-        municipio,
-        calle.nombre,
-        calle.desde_calle,
-        calle.hasta_calle,
-        calle.restricciones,
-        JSON.stringify({ tipo: calle.tipo }),
+        dataset,
+        via.nombre,
+        via.desde,
+        via.hasta,
+        via.notas,
+        JSON.stringify({
+          jerarquia: via.jerarquia,
+          limite_peso_kg: datos.config?.limite_peso_kg,
+          altura_max_m: datos.config?.altura_max_m,
+        }),
         geomWkt,
       ]
     );
 
     insertados++;
-    console.log(`  ✓ ${calle.nombre}`);
+    console.log(`  ✓ ${via.nombre}`);
   }
 
-  console.log(`\n  Insertadas: ${insertados}`);
-  console.log(`  Sin geometría en red_vial: ${sinGeometria}`);
+  console.log(`  → Insertadas: ${insertados} | Sin geometría: ${sinGeometria}`);
 
   if (sinGeometria > 0) {
     console.log(
-      `\n  Tip: las calles sin geometría no están en red_vial todavía.`
+      `  Tip: las calles sin geometría no están en red_vial todavía.`
     );
-    console.log(
-      `  Verificá que el GeoJSON del municipio esté importado correctamente.`
-    );
+    console.log(`  Verificá que red-vial-${dataset}.geojson esté importado.`);
   }
 }
 
@@ -187,46 +181,44 @@ async function insertarEnRedCamiones(
 // Main
 // ---------------------------------------------------------------------------
 async function main(): Promise<void> {
-  const { pdf, municipio } = parsearArgs();
+  const { municipio, all } = parsearArgs();
 
-  // Verifico que el PDF existe
-  const rutaPdf = path.resolve(pdf);
-  if (!fs.existsSync(rutaPdf)) {
-    console.error(`❌ No se encontró el archivo: ${rutaPdf}`);
+  if (!all && !municipio) {
+    console.error("Uso: --municipio=<slug> | --all");
     process.exit(1);
   }
 
-  console.log(`Municipio: ${municipio}`);
-  console.log(`PDF: ${rutaPdf}`);
-
-  // Extraigo las calles con IA
-  let datos: RespuestaIA;
-  try {
-    datos = leerJSONParsado(municipio);
-    console.log(`\n✓ IA extrajo ${datos.calles.length} calles.`);
-  } catch (err) {
-    console.error("❌ Error al procesar el PDF con la IA:", err);
-    process.exit(1);
-  }
-
-  // Guardo el JSON intermedio para revisión
-  const jsonSalida = path.resolve(
-    `database/data/restricciones/${municipio}-parsed.json`
-  );
-  fs.writeFileSync(jsonSalida, JSON.stringify(datos, null, 2), "utf-8");
-  console.log(`✓ JSON guardado en: ${jsonSalida}`);
-
-  // Inserto en la base de datos
   const dbClient = new Client(DB_CONFIG);
+
   try {
     await dbClient.connect();
-    await insertarEnRedCamiones(dbClient, datos, municipio);
+
+    if (all) {
+      const archivos = fs
+        .readdirSync(RESTRICCIONES_DIR)
+        .filter((f) => f.endsWith(".json") && !f.includes(" "))
+        .map((f) => f.replace(".json", ""))
+        .sort();
+
+      console.log(`Procesando ${archivos.length} municipio(s)...`);
+
+      for (const m of archivos) {
+        try {
+          await procesarMunicipio(dbClient, m);
+        } catch (err) {
+          console.error(`  ✗ Error en ${m}:`, err);
+        }
+      }
+    } else {
+      await procesarMunicipio(dbClient, municipio!);
+    }
+
     console.log("\n✅ Listo.");
     console.log(
       "   Siguiente paso: psql -d safetruck -f database/sql/03_restrictions.sql"
     );
   } catch (err) {
-    console.error("❌ Error al insertar en la base de datos:", err);
+    console.error("❌ Error:", err);
     process.exit(1);
   } finally {
     await dbClient.end();
