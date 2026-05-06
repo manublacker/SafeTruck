@@ -16,3 +16,9 @@ cache/
 # Next.js build output
 .next/
 safetruck-next/.next/
+Temas para la evaluación oral de testing (1).pdf
+
+# Artefactos derivados de scripts de partidos (regenerables)
+database/data/base/red-vial-*.geojson
+database/data/restricciones/tramos-por-nombre-*.json
+database/data/restricciones/reporte-*.txt
