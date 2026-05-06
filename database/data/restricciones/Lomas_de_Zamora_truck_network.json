@@ -1,0 +1,71 @@
+{
+  "partido": "Lomas de Zamora",
+  "fuente_legal": "Ordenanza 7730 - Bandas de Circulación y Plano de Zonificación",
+  "config": {
+    "limite_peso_general_kg": 10000,
+    "altura_estandar_m": 4.10,
+    "politica_ruteo": "Priorizar_Red_Vial_Principal"
+  },
+  "calles_habilitadas": [
+    {
+      "nombre": "Camino Negro (Autopista Pte. Perón)",
+      "desde": "Puente de la Noria",
+      "hasta": "Calle Juan XXIII",
+      "jerarquia": "Red Vial Principal"
+    },
+    {
+      "nombre": "Camino de Cintura (Ruta Provincial 4)",
+      "desde": "Av. Antártida Argentina",
+      "hasta": "Av. Donato Álvarez",
+      "jerarquia": "Red Vial Principal"
+    },
+    {
+      "nombre": "Avenida Hipólito Yrigoyen (RP 210)",
+      "desde": "Límite Lanús (Calle 25 de Mayo)",
+      "hasta": "Límite Almirante Brown (Calle Seguí)",
+      "jerarquia": "Red Vial Principal"
+    },
+    {
+      "nombre": "Avenida Alsina",
+      "desde": "Límite Lanús",
+      "hasta": "Límite Almirante Brown",
+      "jerarquia": "Red Vial Principal"
+    },
+    {
+      "nombre": "Avenida Juan XXIII",
+      "desde": "Camino de Cintura",
+      "hasta": "Camino Negro",
+      "jerarquia": "Interconexión Industrial"
+    },
+    {
+      "nombre": "Avenida Antártida Argentina",
+      "desde": "Av. Hipólito Yrigoyen",
+      "hasta": "Camino de Cintura",
+      "jerarquia": "Interconexión Industrial"
+    },
+    {
+      "nombre": "Avenida Eva Perón (Ex Pasco)",
+      "desde": "Av. Almirante Brown",
+      "hasta": "Límite Quilmes",
+      "jerarquia": "Red Vial Principal"
+    },
+    {
+      "nombre": "Avenida General Frías",
+      "desde": "Av. Hipólito Yrigoyen",
+      "hasta": "Av. Antártida Argentina",
+      "jerarquia": "Secundaria"
+    },
+    {
+      "nombre": "Calle Garibaldi",
+      "desde": "Av. Hipólito Yrigoyen",
+      "hasta": "Av. Frías",
+      "jerarquia": "Secundaria"
+    }
+  ],
+  "alertas_altura_critica": [
+    {"ubicacion": "PBN Rincón - Vieytes (Banfield)", "altura_max_m": 3.40},
+    {"ubicacion": "PBN Loria - Ayacucho (Lomas Centro)", "altura_max_m": 3.80},
+    {"ubicacion": "PBN Pereyra Lucena - Matheu", "altura_max_m": 4.10},
+    {"ubicacion": "PBN Larroque - Chacabuco (Banfield)", "altura_max_m": 4.10}
+  ]
+}

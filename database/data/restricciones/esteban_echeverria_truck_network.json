@@ -1,0 +1,12 @@
+{
+  "partido": "Esteban Echeverría",
+  "config": { "peso_max_local_kg": 12000, "altura_estandar_m": 4.10 },
+  "vias_habilitadas": [
+    {"nombre": "Ruta Provincial 4 (Camino de Cintura)", "tramo": "Completo dentro del partido"},
+    {"nombre": "Ruta Provincial 205", "desde": "Av. Jorge Newbery", "hasta": "Límite Ezeiza"},
+    {"nombre": "Avenida Valette", "desde": "Ruta 4", "hasta": "Ruta 205"},
+    {"nombre": "Avenida Fair / Av. Luciano Valette", "desde": "Camino de Cintura", "hasta": "Calle Cervetti"},
+    {"nombre": "Avenida Mariano Castex (RP58)", "desde": "Rotonda de la Mujer", "hasta": "Límite San Vicente"},
+    {"nombre": "Calle Cervetti", "desde": "Autopista Riccheri", "hasta": "Av. Fair (Acceso logístico)"}
+  ]
+}

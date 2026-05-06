@@ -1,0 +1,11 @@
+{
+  "partido": "Ezeiza",
+  "config": { "peso_max_local_kg": 10000, "altura_estandar_m": 4.10 },
+  "vias_habilitadas": [
+    {"nombre": "Autopista Ezeiza-Cañuelas", "tramo": "Toda su extensión"},
+    {"nombre": "Ruta Provincial 205", "desde": "Límite E. Echeverría", "hasta": "Límite Cañuelas"},
+    {"nombre": "Ruta Provincial 52", "desde": "RP 58", "hasta": "Límite San Vicente (Zona de Logística)"},
+    {"nombre": "Avenida Jorge Newbery", "desde": "Autopista Riccheri", "hasta": "RP 205"},
+    {"nombre": "Avenida 12 de Octubre", "desde": "Ruta 205", "hasta": "Zona Industrial La Unión"}
+  ]
+}

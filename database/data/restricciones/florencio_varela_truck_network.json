@@ -1,0 +1,58 @@
+{
+  "partido": "Florencio Varela",
+  "fuente_legal": "Código de Zonificación y Decreto de Red de Tránsito Pesado",
+  "config": {
+    "limite_peso_general_kg": 12000,
+    "altura_estandar_m": 4.10,
+    "politica_ruteo": "Bypass_Centro_Via_Novak"
+  },
+  "calles_habilitadas": [
+    {
+      "nombre": "Avenida Jorge Novak",
+      "desde": "Av. San Martín",
+      "hasta": "Ruta Provincial 36",
+      "notas": "Eje troncal obligatorio para tránsito pesado"
+    },
+    {
+      "name": "Ruta Provincial 36",
+      "start": "Límite Berazategui (Cruce Varela)",
+      "end": "Límite La Plata (Ruta 2)",
+      "notes": "Ruta de libre circulación"
+    },
+    {
+      "name": "Avenida Eva Perón (RP 53)",
+      "start": "Av. 12 de Octubre",
+      "end": "Límite La Plata",
+      "notes": "Conector rural/industrial (obras de duplicación en curso)"
+    },
+    {
+      "name": "Avenida Hudson",
+      "start": "Av. San Martín",
+      "end": "Ruta Provincial 36",
+      "notes": "Vía de interconexión logística"
+    },
+    {
+      "name": "Avenida Intendente José Luis Cariboni",
+      "start": "Av. Hudson",
+      "end": "Calle de la Ancianidad",
+      "notes": "Tramo optimizado para carga"
+    },
+    {
+      "name": "Avenida Luján",
+      "start": "Ruta Provincial 36",
+      "end": "Av. Hudson",
+      "notes": "Acceso zona industrial"
+    },
+    {
+      "name": "Avenida Calchaquí",
+      "start": "Límite Quilmes",
+      "end": "Ruta Provincial 36",
+      "notes": "Acceso principal norte"
+    }
+  ],
+  "alertas_altura_critica": [
+    {"ubicacion": "PBN Av. San Martín (Bajo Vías)", "altura_max_m": 4.10},
+    {"ubicacion": "PBN Brasil - Estados Unidos (En obra)", "altura_max_m": 3.80},
+    {"ubicacion": "Puentes ferroviarios antiguos centro", "altura_max_m": 3.80}
+  ]
+}

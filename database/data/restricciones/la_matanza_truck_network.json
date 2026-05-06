@@ -1,0 +1,25 @@
+{
+  "partido": "La Matanza",
+  "config": {
+    "global_weight_limit_kg": 10000,
+    "max_standard_height_m": 4.10,
+    "routing_policy": "Strict_Network_Only"
+  },
+  "allowed_streets": [
+    {"name": "Ruta Nacional 3", "start": "Av. General Paz", "end": "Límite Cañuelas"},
+    {"name": "Camino de Cintura (RP4)", "start": "Av. Don Bosco", "end": "Límite E. Echeverría"},
+    {"name": "Autopista Riccheri", "start": "Av. General Paz", "end": "Límite Ezeiza"},
+    {"name": "Ruta Provincial 21", "start": "Av. General Paz", "end": "Límite Merlo"},
+    {"name": "Ruta Provincial 17", "start": "Límite Morón", "end": "Av. Crovara"},
+    {"name": "Avenida Crovara", "start": "Av. General Paz", "end": "Camino de Cintura"},
+    {"name": "Avenida Christiania", "start": "Av. Crovara", "end": "Ruta Nacional 3"},
+    {"name": "Avenida Juan Manuel de Rosas", "start": "Av. General Paz", "end": "Virrey del Pino (Km 47)"},
+    {"name": "Avenida Illia", "start": "Av. Juan Manuel de Rosas", "end": "Camino de Cintura"},
+    {"name": "Avenida Arieta", "start": "Camino de Cintura", "end": "Villegas"}
+  ],
+  "hazards_height_limit": [
+    {"location": "Puentes FFCC Sarmiento (Ramos Mejía)", "max_height": 3.60},
+    {"location": "Puente Gral. Paz y Crovara", "max_height": 4.10},
+    {"location": "PBN San Justo (Ruta 3)", "max_height": 4.10}
+  ]
+}

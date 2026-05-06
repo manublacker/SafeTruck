@@ -1,0 +1,30 @@
+{
+  "partido": "San Isidro",
+  "config": {
+    "global_weight_limit_kg": 12000,
+    "max_standard_height_m": 4.10,
+    "routing_policy": "Strict_Network_Only"
+  },
+  "allowed_streets": [
+    {"name": "Autopista Panamericana", "start": "Calle Paraná", "end": "Calle Uruguay"},
+    {"name": "Ramal Tigre", "start": "Empalme Panamericana", "end": "Calle Uruguay"},
+    {"name": "Av. Avelino Rolón (RP4)", "start": "Av. Amancio Alcorta", "end": "Av. Uruguay"},
+    {"name": "Av. Bernabé Márquez (RP4)", "start": "Av. Sir Alexander Fleming", "end": "Av. Avelino Rolón"},
+    {"name": "Av. Uruguay", "start": "Colectora Panamericana", "end": "Av. Sucre"},
+    {"name": "Av. Sucre", "start": "Av. Avelino Rolón", "end": "Calle Don Bosco"},
+    {"name": "Av. Centenario / Santa Fe", "start": "Calle Paraná", "end": "Av. Uruguay"},
+    {"name": "Av. Amancio Alcorta", "start": "Calle Paraná", "end": "Av. Avelino Rolón"},
+    {"name": "Av. de Mayo", "start": "Av. Rivadavia", "end": "Av. Avelino Rolón"},
+    {"name": "Camino Real Morón", "start": "Av. Avelino Rolón", "end": "Calle Uruguay"},
+    {"name": "Av. Unidad Nacional", "start": "Av. Santa Fe", "end": "Av. Sir Alexander Fleming"}
+  ],
+  "hazards_height_limit": [
+    {"location": "Túnel Pueyrredón", "max_height": 2.20},
+    {"location": "Túnel Estrada", "max_height": 2.40},
+    {"location": "Túnel Primera Junta", "max_height": 2.40},
+    {"location": "Túnel Roque Sáenz Peña", "max_height": 2.50},
+    {"location": "Túnel Güemes", "max_height": 2.40},
+    {"location": "Túnel España", "max_height": 2.80},
+    {"location": "Túnel Florencio Varela", "max_height": 2.40}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "partido": "Tigre",
+  "config": { "peso_max_local_kg": 7000, "altura_estandar_m": 4.10 },
+  "vias_habilitadas": [
+    {"nombre": "Ruta Provincial 197", "desde": "General Pacheco", "hasta": "Puerto de Tigre"},
+    {"nombre": "Ruta Provincial 27", "desde": "Benavídez", "hasta": "Rincón de Milberg"},
+    {"nombre": "Avenida Henry Ford", "desde": "Panamericana", "hasta": "Límite Malvinas Argentinas"},
+    {"nombre": "Avenida de los Constituyentes (Ex Ruta 9)", "desde": "General Pacheco", "hasta": "Benavídez"},
+    {"nombre": "Calle Sarmiento", "desde": "Av. Cazón", "hasta": "Puerto (Sentido obligatorio carga)"},
+    {"nombre": "Avenida Italia", "desde": "Puerto", "hasta": "Canal San Fernando (Salida carga)"},
+    {"nombre": "Avenida Benavídez", "desde": "Panamericana", "hasta": "Ruta 27"}
+  ]
+}

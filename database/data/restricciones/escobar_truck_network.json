@@ -1,0 +1,11 @@
+{
+  "partido": "Escobar",
+  "config": { "peso_max_local_kg": 3500, "altura_estandar_m": 4.10 },
+  "vias_habilitadas": [
+    {"nombre": "Ruta Provincial 25", "desde": "Matheu", "hasta": "Puente de la Arenera (Río Luján)"},
+    {"nombre": "Avenida de los Inmigrantes", "desde": "Colectora Este Panamericana", "hasta": "Zona de Viveros"},
+    {"nombre": "Avenida de los Constituyentes", "desde": "Garín", "hasta": "Límite Tigre"},
+    {"nombre": "Calle General Güemes", "desde": "Panamericana", "hasta": "Zona Industrial Matheu"},
+    {"nombre": "Avenida Villanueva", "desde": "Ingeniero Maschwitz", "hasta": "Ruta 26"}
+  ]
+}
