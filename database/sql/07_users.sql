@@ -7,9 +7,8 @@
 --    Almacena credenciales y datos personales de cada usuario.
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-    id            SERIAL PRIMARY KEY,
+    id            UUID PRIMARY KEY,
     email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
     full_name     TEXT NOT NULL,
     company       TEXT,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -25,7 +24,7 @@ CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS trucks (
     id               SERIAL PRIMARY KEY,
-    user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name             TEXT NOT NULL,                -- ej: "Volvo FH #1"
     max_weight_kg    DOUBLE PRECISION NOT NULL,    -- peso máximo en kg
     max_height_m     DOUBLE PRECISION NOT NULL,    -- altura máxima en metros

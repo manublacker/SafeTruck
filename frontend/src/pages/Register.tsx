@@ -180,7 +180,7 @@ const Register = () => {
           },
         });
       } catch (err) {
-        setErrors({ email: err instanceof Error ? err.message : "Error al crear la cuenta." });
+        setErrors({ general: err instanceof Error ? err.message : "Error al crear la cuenta." });
         return;
       }
       setResendIn(60);
@@ -422,6 +422,7 @@ const Register = () => {
                     </div>
                   </div>
 
+                  {errors.general && <p className="auth-error">{errors.general}</p>}
                   <button onClick={next} className="auth-btn">Continuar</button>
                 </div>
               )}

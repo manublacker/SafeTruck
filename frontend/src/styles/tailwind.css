@@ -808,6 +808,29 @@
   .auth-page {
     min-height: 100vh;
     background: #1c2b3a;
+    position: relative;
+  }
+
+  .auth-back-home {
+    position: absolute;
+    top: 1.25rem;
+    left: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #b0bec5;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .auth-back-home:hover {
+    color: #eceff1;
+  }
+
+  .auth-back-home svg {
+    flex-shrink: 0;
   }
 
   .auth-main {

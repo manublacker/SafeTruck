@@ -7,15 +7,22 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import type { AuthUser } from "@/types/auth";
+import type { AuthUser, Driver } from "@/types/auth";
 import { supabase } from "@/lib/supabase";
-import { setToken, removeToken, registerUnauthorizedHandler } from "@/services/api";
+import {
+  setToken,
+  removeToken,
+  registerUnauthorizedHandler,
+  fetchDrivers,
+} from "@/services/api";
 import { fetchUserProfile } from "@/services/authApi";
 
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   authReady: boolean;
+  drivers: Driver[];
+  refreshDrivers: () => Promise<void>;
   login: (token: string, user: AuthUser) => void;
   logout: () => Promise<void>;
 }
@@ -25,15 +32,34 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]        = useState<AuthUser | null>(null);
   const [token, setTokenState] = useState<string | null>(null);
+  const [drivers, setDrivers]  = useState<Driver[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const fetchingProfile = useRef(false);
+
+  const refreshDrivers = useCallback(async () => {
+    try {
+      const list = await fetchDrivers();
+      setDrivers(list);
+    } catch (err) {
+      console.error("Error al refrescar conductores:", err);
+    }
+  }, []);
 
   const ensureProfile = useCallback(async (accessToken: string) => {
     if (fetchingProfile.current) return;
     fetchingProfile.current = true;
     try {
       const res = await fetchUserProfile(accessToken, {});
-      setUser(res.user);
+      // El backend todavía no devuelve drivers en /profile —
+      // los traemos aparte para que el contexto los exponga.
+      let driversList: Driver[] = [];
+      try {
+        driversList = await fetchDrivers();
+      } catch (err) {
+        console.error("Error al obtener conductores:", err);
+      }
+      setUser({ ...res.user, drivers: driversList });
+      setDrivers(driversList);
     } catch (err) {
       console.error("Error al obtener el perfil:", err);
     } finally {
@@ -63,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         removeToken();
         setTokenState(null);
         setUser(null);
+        setDrivers([]);
       }
     });
 
@@ -74,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
     setTokenState(newToken);
     setUser(newUser);
+    setDrivers(newUser.drivers ?? []);
   }, []);
 
   const logout = useCallback(async () => {
@@ -81,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     removeToken();
     setTokenState(null);
     setUser(null);
+    setDrivers([]);
   }, []);
 
   useEffect(() => {
@@ -88,7 +117,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ user, token, authReady, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, token, authReady, drivers, refreshDrivers, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

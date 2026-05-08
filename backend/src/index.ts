@@ -17,6 +17,9 @@ import searchRouter from "./routes/search";
 import reportsRouter from "./routes/reports";
 import authRouter from "./routes/auth";
 import usersRouter from "./routes/users";
+import trucksRouter from "./routes/trucks";
+import driversRouter from "./routes/drivers";
+import truckDriversRouter from "./routes/truck-drivers";
 import { authMiddleware } from "./middleware/authMiddleware";
 import { notifyPendingTrips } from "./jobs/notifyTrips";
 import incidentsRouter from "./routes/incidents";
@@ -64,6 +67,9 @@ app.use("/api/municipio", municipioParser);
 app.use("/api/search", searchRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/trucks",        authMiddleware, trucksRouter);
+app.use("/api/drivers",       authMiddleware, driversRouter);
+app.use("/api/truck-drivers", authMiddleware, truckDriversRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "SafeTruck API" });

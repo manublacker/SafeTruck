@@ -8,7 +8,7 @@ export class VerificationNeededError extends Error {
 }
 import type { AuthResponse, RegisterPayload, LoginPayload } from "@/types/auth";
 
-const API_URL = "https://safetruck-backend.icysky-af60cdde.canadacentral.azurecontainerapps.io";
+const API_URL = "https://safetruck-backend-production.up.railway.app";
 
 async function callProfile(token: string, body: Record<string, unknown>): Promise<AuthResponse> {
   const res = await fetch(`${API_URL}/api/auth/profile`, {

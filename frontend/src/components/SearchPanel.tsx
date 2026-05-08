@@ -1,9 +1,8 @@
 /**
  * SearchPanel.tsx
  *
- * Port de frontend/scripts/app.js + geocodingService.js.
- * Panel flotante izquierdo con formulario de búsqueda, autocompletado
- * y GPS para el origen.
+ * Widget de búsqueda con origen/destino combinados (estilo Waze/Google Maps),
+ * autocompletado, GPS y perfil del camión colapsable.
  */
 
 import { useState, useRef, useEffect } from "react";
@@ -12,14 +11,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { RouteRequest } from "@/types/route";
 
 interface LocationField {
-  value:          string;
-  selected:       GeoSuggestion | null;
-  status:         string;
-  suggestions:    GeoSuggestion[];
+  value:           string;
+  selected:        GeoSuggestion | null;
+  status:          string;
+  suggestions:     GeoSuggestion[];
   showSuggestions: boolean;
 }
 
-const INITIAL_STATUS = "Escribi una direccion o lugar y elegi una sugerencia.";
+const INITIAL_STATUS = "Escribí origen y destino para calcular la ruta.";
 
 function initField(defaultValue: string): LocationField {
   return {
@@ -75,9 +74,9 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
         if (prev.selected) return prev;
         const { latitude: lat, longitude: lon } = pos.coords;
         return {
-          value:    "Mi ubicacion",
-          selected: { label: "Mi ubicacion", lat, lon, score: 1, source: "backend" },
-          status:   `Ubicacion actual: ${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+          value:    "Mi ubicación",
+          selected: { label: "Mi ubicación", lat, lon, score: 1, source: "backend" },
+          status:   `Ubicación actual: ${lat.toFixed(4)}, ${lon.toFixed(4)}`,
           suggestions: [],
           showSuggestions: false,
         };
@@ -96,14 +95,14 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
       ...f,
       value,
       selected: null,
-      status: "Buscando sugerencias...",
+      status: "Buscando sugerencias…",
       showSuggestions: false,
     }));
 
     if (timerRef.current) clearTimeout(timerRef.current);
 
     if (value.trim().length < 3) {
-      setField((f) => ({ ...f, status: "Escribi al menos 3 caracteres para buscar." }));
+      setField((f) => ({ ...f, status: "Escribí al menos 3 caracteres." }));
       return;
     }
 
@@ -113,7 +112,7 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
         if (!suggestions.length) {
           setField((f) => ({
             ...f,
-            status: "No encontramos sugerencias para ese texto.",
+            status: "Sin sugerencias para ese texto.",
             suggestions: [],
             showSuggestions: false,
           }));
@@ -123,7 +122,7 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
           ...f,
           suggestions,
           showSuggestions: true,
-          status: "Elegi una sugerencia para fijar coordenadas reales.",
+          status: "Elegí una sugerencia para fijar coordenadas.",
         }));
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Error al buscar.";
@@ -139,7 +138,7 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
     setField({
       value:    suggestion.label,
       selected: suggestion,
-      status:   `Ubicacion confirmada: ${suggestion.lat.toFixed(4)}, ${suggestion.lon.toFixed(4)}`,
+      status:   `Confirmado: ${suggestion.lat.toFixed(4)}, ${suggestion.lon.toFixed(4)}`,
       suggestions: [],
       showSuggestions: false,
     });
@@ -154,12 +153,12 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
     setField: React.Dispatch<React.SetStateAction<LocationField>>
   ): Promise<GeoSuggestion> {
     if (field.selected) return field.selected;
-    setField((f) => ({ ...f, status: "Resolviendo coordenadas..." }));
+    setField((f) => ({ ...f, status: "Resolviendo coordenadas…" }));
     const resolved = await geocodeLocation(field.value.trim());
     setField({
       value:    resolved.label,
       selected: resolved,
-      status:   `Ubicacion confirmada: ${resolved.lat.toFixed(4)}, ${resolved.lon.toFixed(4)}`,
+      status:   `Confirmado: ${resolved.lat.toFixed(4)}, ${resolved.lon.toFixed(4)}`,
       suggestions: [],
       showSuggestions: false,
     });
@@ -187,79 +186,108 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
     }
   }
 
+  // ── Mostrar UN solo status — destino tiene prioridad si cambió ──
+
+  const statusMessage =
+    destination.status !== INITIAL_STATUS ? destination.status : origin.status;
+
+  // Mapeo del statusLabel a un data-attribute para colorear el pill
+  const pillStatus =
+    statusLabel === "Calculando…"        ? "loading" :
+    statusLabel === "Ruta encontrada"    ? "found"   :
+    statusLabel === "Sin ruta compatible" ? "error"  :
+    statusLabel === "Error al calcular"  ? "error"   : "idle";
+
   // ── Render ───────────────────────────────────────────────────
 
   return (
     <section className="search-panel">
+      <header className="search-panel-header">
+        <h1 className="search-panel-title">Ruta</h1>
+        <span className="status-pill-mini" data-status={pillStatus}>
+          {statusLabel}
+        </span>
+      </header>
+
       <form id="route-form" className="route-form" onSubmit={handleSubmit}>
 
-        {/* ── Origen ── */}
-        <div className="location-field">
-          <label className="field">
-            <span>Origen</span>
-            <input
-              id="origin-input"
-              type="text"
-              value={origin.value}
-              autoComplete="off"
-              required
-              onChange={(e) => handleInput(setOrigin, originTimerRef, e.target.value)}
-              onBlur={() => handleBlur(setOrigin)}
-            />
-          </label>
-          <p id="origin-status" className="field-status">{origin.status}</p>
-          {origin.showSuggestions && origin.suggestions.length > 0 && (
-            <ul id="origin-suggestions" className="suggestions-list">
-              {origin.suggestions.map((s, i) => (
-                <li key={i}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); handleSelect(setOrigin, s); }}
-                  >
-                    {s.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+        {/* ── Widget combinado origen + destino ── */}
+        <div className="search-widget">
+          {/* Origen */}
+          <div className="search-row-wrap">
+            <div className="search-row">
+              <span className="search-row-icon search-row-icon--origin" aria-hidden="true" />
+              <input
+                id="origin-input"
+                type="text"
+                className="search-row-input"
+                value={origin.value}
+                placeholder="Origen"
+                autoComplete="off"
+                required
+                onChange={(e) => handleInput(setOrigin, originTimerRef, e.target.value)}
+                onBlur={() => handleBlur(setOrigin)}
+              />
+            </div>
+            {origin.showSuggestions && origin.suggestions.length > 0 && (
+              <ul id="origin-suggestions" className="suggestions-list">
+                {origin.suggestions.map((s, i) => (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); handleSelect(setOrigin, s); }}
+                    >
+                      {s.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="search-row-divider" aria-hidden="true" />
+
+          {/* Destino */}
+          <div className="search-row-wrap">
+            <div className="search-row">
+              <span className="search-row-icon search-row-icon--destination" aria-hidden="true" />
+              <input
+                id="destination-input"
+                type="text"
+                className="search-row-input"
+                value={destination.value}
+                placeholder="Destino"
+                autoComplete="off"
+                required
+                onChange={(e) => handleInput(setDestination, destTimerRef, e.target.value)}
+                onBlur={() => handleBlur(setDestination)}
+              />
+            </div>
+            {destination.showSuggestions && destination.suggestions.length > 0 && (
+              <ul id="destination-suggestions" className="suggestions-list">
+                {destination.suggestions.map((s, i) => (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); handleSelect(setDestination, s); }}
+                    >
+                      {s.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
-        {/* ── Destino ── */}
-        <div className="location-field">
-          <label className="field">
-            <span>Destino</span>
-            <input
-              id="destination-input"
-              type="text"
-              value={destination.value}
-              autoComplete="off"
-              required
-              onChange={(e) => handleInput(setDestination, destTimerRef, e.target.value)}
-              onBlur={() => handleBlur(setDestination)}
-            />
-          </label>
-          <p id="destination-status" className="field-status">{destination.status}</p>
-          {destination.showSuggestions && destination.suggestions.length > 0 && (
-            <ul id="destination-suggestions" className="suggestions-list">
-              {destination.suggestions.map((s, i) => (
-                <li key={i}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); handleSelect(setDestination, s); }}
-                  >
-                    {s.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <p className="search-status-line" aria-live="polite">
+          {statusMessage}
+        </p>
 
         {/* ── Perfil del camion ── */}
         <details className="truck-details">
           <summary>Perfil del camión y preferencias</summary>
 
-          {/* Truck selector cards */}
           {trucks.length > 0 && (
             <div className="truck-selector">
               {trucks.map((t) => (
@@ -284,7 +312,7 @@ export default function SearchPanel({ onSearch, isLoading, statusLabel }: Props)
                 onClick={() => selectTruck("custom")}
               >
                 <span className="truck-card-name">+ Nuevo</span>
-                <span className="truck-card-spec">Ingresar dimensiones manualmente</span>
+                <span className="truck-card-spec">Ingresar manualmente</span>
               </button>
             </div>
           )}

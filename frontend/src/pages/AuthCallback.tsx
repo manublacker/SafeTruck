@@ -7,6 +7,11 @@ export default function AuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    if (hash.get("type") === "recovery") {
+      navigate("/reset-password", { replace: true });
+      return;
+    }
     if (!authReady) return;
     if (user) navigate("/dashboard", { replace: true });
     else navigate("/login", { replace: true });

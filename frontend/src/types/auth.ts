@@ -1,4 +1,4 @@
-// types/auth.ts — contratos de autenticación
+// types/auth.ts — contratos de autenticación y dominio de flota
 
 export interface Truck {
   id: number;
@@ -7,6 +7,26 @@ export interface Truck {
   max_height_m: number;
   max_width_m: number;
   max_length_m: number;
+  patente: string | null;
+  modelo: string | null;
+  anio: number | null;
+  km_actual: number | null;
+  fecha_service: string | null;
+  proximo_service: string | null;
+  estado: string;
+  created_at: string;
+  driver?: { id: number; nombre: string; telefono: string | null } | null;
+}
+
+export interface Driver {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  licencia: string | null;
+  categoria_licencia: string | null;
+  vencimiento_licencia: string | null;
+  estado: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -16,6 +36,7 @@ export interface AuthUser {
   full_name: string;
   company: string | null;
   trucks: Truck[];
+  drivers: Driver[];
 }
 
 export interface AuthResponse {

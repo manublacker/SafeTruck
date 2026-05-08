@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { login as apiLogin, signInWithGoogle } from "@/services/authApi";
+import { login as apiLogin, signInWithGoogle, forgotPassword } from "@/services/authApi";
 import safeTruckLogo from "@/assets/logo_safetruck.png";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,6 +20,9 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +44,20 @@ const Login = () => {
     }
   };
 
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) { setErrors({ email: "Ingresá tu email" }); return; }
+    setForgotLoading(true);
+    try {
+      await forgotPassword(email);
+      setForgotSent(true);
+    } catch (err) {
+      setErrors({ email: err instanceof Error ? err.message : "Error al enviar el email." });
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const handleGoogle = async () => {
     try {
       await signInWithGoogle(`${window.location.origin}/auth/callback`);
@@ -51,6 +68,12 @@ const Login = () => {
 
   return (
     <div className="auth-page tw-page">
+      <Link to="/" className="auth-back-home">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Inicio
+      </Link>
       <main className="auth-main">
         <Link to="/" className="auth-logo">
           <img src={safeTruckLogo} alt="Safe Truck" className="auth-logo__img" />
@@ -58,6 +81,50 @@ const Login = () => {
 
         <div className="auth-card">
           <div className="auth-card__inner">
+            {forgotMode ? (
+              forgotSent ? (
+                <>
+                  <h1 className="auth-title">Revisá tu email</h1>
+                  <p className="auth-subtitle">
+                    Te enviamos un link para restablecer tu contraseña a{" "}
+                    <strong>{email}</strong>.
+                  </p>
+                  <button
+                    type="button"
+                    className="auth-btn"
+                    onClick={() => { setForgotMode(false); setForgotSent(false); }}
+                  >
+                    Volver al login
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="auth-back" onClick={() => setForgotMode(false)}>
+                    ← Volver al login
+                  </button>
+                  <h1 className="auth-title">Restablecer contraseña</h1>
+                  <p className="auth-subtitle">Ingresá tu email y te enviamos un link.</p>
+                  <form onSubmit={handleForgot} className="auth-fields" noValidate>
+                    <div className="auth-field">
+                      <label className="auth-field__label">Email</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="empresa@mail.com"
+                        maxLength={255}
+                        className="auth-input"
+                      />
+                      {errors.email && <p className="auth-error">{errors.email}</p>}
+                    </div>
+                    <button type="submit" className="auth-btn" disabled={forgotLoading}>
+                      {forgotLoading ? "Enviando…" : "Enviar link"}
+                    </button>
+                  </form>
+                </>
+              )
+            ) : (
+              <>
             <h1 className="auth-title">Iniciá sesión</h1>
             <p className="auth-subtitle">Bienvenido de vuelta.</p>
 
@@ -98,7 +165,7 @@ const Login = () => {
                   />
                   Recordarme
                 </label>
-                <a href="#" className="auth-link" style={{ fontSize: "0.875rem" }}>¿Olvidaste tu contraseña?</a>
+                <button type="button" onClick={() => setForgotMode(true)} className="auth-link" style={{ fontSize: "0.875rem", background: "none", border: "none", cursor: "pointer", font: "inherit" }}>¿Olvidaste tu contraseña?</button>
               </div>
 
               <button type="submit" className="auth-btn" style={{ marginTop: "0.5rem" }}>
@@ -112,6 +179,8 @@ const Login = () => {
               <GoogleIcon />
               Continuar con Google
             </button>
+              </>
+            )}
           </div>
 
           <p className="auth-footer-text" style={{ color: "#ffffff", fontSize: "1rem" }}>

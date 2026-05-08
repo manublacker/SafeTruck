@@ -11,13 +11,24 @@ interface TruckRow {
   max_height_m: number;
   max_width_m: number;
   max_length_m: number;
+  patente: string | null;
+  modelo: string | null;
+  anio: number | null;
+  km_actual: number | null;
+  fecha_service: string | null;
+  proximo_service: string | null;
+  estado: string;
   created_at: string;
 }
 
 async function getTrucksForUser(userId: string): Promise<TruckRow[]> {
   const result = await pool.query<TruckRow>(
-    `SELECT id, name, max_weight_kg, max_height_m, max_width_m, max_length_m, created_at
-     FROM trucks WHERE user_id = $1 ORDER BY created_at ASC`,
+    `SELECT id, name, max_weight_kg, max_height_m, max_width_m, max_length_m,
+            patente, modelo, anio, km_actual, fecha_service, proximo_service,
+            estado, created_at
+     FROM trucks
+     WHERE user_id = $1 AND is_active = true
+     ORDER BY created_at ASC`,
     [userId]
   );
   return result.rows;
