@@ -4,7 +4,6 @@ import HowItWorks from "@/components/landing/HowItWorks";
 import Features from "@/components/landing/Features";
 import Plans from "@/components/landing/Plans";
 import About from "@/components/landing/About";
-import FinalCta from "@/components/landing/FinalCta";
 import Footer from "@/components/landing/Footer";
 
 const Index = () => {
@@ -16,7 +15,6 @@ const Index = () => {
       <HowItWorks />
       <Plans />
       <About />
-      <FinalCta />
       <Footer />
     </div>
   );
