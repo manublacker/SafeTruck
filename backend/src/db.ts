@@ -20,6 +20,7 @@ const pool = process.env.DATABASE_URL
       database: process.env.PGDATABASE ?? "safetruck",
       user:     process.env.PGUSER     ?? "postgres",
       password: process.env.PGPASSWORD ?? "postgres",
+      ssl: { rejectUnauthorized: false },
     });
 
 export default pool;
