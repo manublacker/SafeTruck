@@ -73,6 +73,7 @@ function archivosPartido(slug: string) {
 // Partidos del conurbano soportados. Slug → { nombre legible, jurisdiccion }
 const PARTIDOS_NUEVOS: Record<string, { nombre: string; jurisdiccion: string }> = {
   "la-matanza": { nombre: "La Matanza", jurisdiccion: "Buenos Aires" },
+  "lanus":      { nombre: "Lanús",      jurisdiccion: "Buenos Aires" },
 };
 
 // ---------------------------------------------------------------------------

@@ -126,7 +126,20 @@ def cargar_tramos(path: Path) -> list[dict]:
                     "notas":     t.get("notes") or t.get("notas"),
                 })
             return tramos
-    raise ValueError(f"No encontré allowed_streets / calles_habilitadas / vias_habilitadas en {path}")
+    # Esquema lanus-parsed: { "calles": [{ "nombre", "desde_calle", "hasta_calle", "tipo" }] }
+    if "calles" in data:
+        return [
+            {
+                "calle":     t.get("nombre"),
+                "desde":     t.get("desde_calle"),
+                "hasta":     t.get("hasta_calle"),
+                "tramo":     None,
+                "jerarquia": t.get("tipo"),
+                "notas":     t.get("restricciones"),
+            }
+            for t in data["calles"]
+        ]
+    raise ValueError(f"No encontré allowed_streets / calles_habilitadas / vias_habilitadas / calles en {path}")
 
 
 def cargar_osm(geojson_path: Path) -> tuple[set[str], set[str]]:
@@ -141,7 +154,10 @@ def cargar_osm(geojson_path: Path) -> tuple[set[str], set[str]]:
         p = feat.get("properties", {})
         name = p.get("name")
         if name:
-            nombres.add(normalizar_para_matching(name))
+            names = name if isinstance(name, list) else [name]
+            for n in names:
+                if n:
+                    nombres.add(normalizar_para_matching(str(n)))
         ref = p.get("ref")
         if ref:
             # ref puede venir como "RP21;070-03" → desarmar
