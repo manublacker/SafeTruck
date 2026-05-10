@@ -27,6 +27,7 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
     password: payload.password,
     options: {
       data: { full_name: payload.full_name, company: payload.company ?? null },
+      emailRedirectTo: "https://safe-truck-76h3.vercel.app/auth/callback",
     },
   });
 
@@ -45,7 +46,9 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
 }
 
 export async function forgotPassword(email: string): Promise<void> {
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: "https://safe-truck-76h3.vercel.app/auth/callback",
+  });
   if (error) throw new Error(error.message);
 }
 

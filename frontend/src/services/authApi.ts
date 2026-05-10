@@ -53,7 +53,7 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
 
 export async function forgotPassword(email: string): Promise<void> {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/callback`,
+    redirectTo: "https://safe-truck-76h3.vercel.app/auth/callback",
   });
   if (error) throw new Error(error.message);
 }
