@@ -176,7 +176,7 @@ router.post("/", async (req: Request, res: Response) => {
         if (index < nodePath.length - 1) {
           const siguienteId = nodePath[index + 1];
           const resArista = await pool.query(
-            `SELECT COALESCE(rv.nombre_buscable, '') AS nombre_buscable,
+            `SELECT COALESCE(a.nombre, rv.nombre_buscable, '') AS nombre_buscable,
                 ST_AsGeoJSON(a.geom) AS geom_json, a.source AS src, a.id AS arista_id
              FROM aristas a LEFT JOIN red_vial rv ON rv.id = a.red_vial_id
              WHERE (a.source = $1::integer AND a.target = $2::integer)
