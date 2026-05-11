@@ -14,7 +14,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getToken } from './api';
 
-const API_URL = 'https://safetruck-backend.icysky-af60cdde.canadacentral.azurecontainerapps.io';
+const API_URL = 'https://safetruck-backend-production.up.railway.app';
 
 // configuro cómo se muestran las notificaciones cuando la app está abierta
 Notifications.setNotificationHandler({
@@ -52,9 +52,14 @@ export async function registerPushToken(): Promise<void> {
     return;
   }
 
-  // obtengo el token del dispositivo
-  const tokenData = await Notifications.getExpoPushTokenAsync();
-  const pushToken = tokenData.data;
+  // obtengo el token del dispositivo (falla en Expo Go sin projectId — ignorar)
+  let pushToken: string;
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    pushToken = tokenData.data;
+  } catch {
+    return;
+  }
 
   // lo mando al backend para guardarlo
   const authToken = getToken();

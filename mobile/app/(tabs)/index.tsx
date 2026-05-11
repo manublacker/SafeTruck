@@ -604,23 +604,6 @@ setSelectedRoute('main');
             </TouchableOpacity>
           </View>
 
-          {activeSuggestions.length > 0 && (
-            <FlatList
-              style={styles.suggestList}
-              data={activeSuggestions}
-              keyExtractor={(_, i) => String(i)}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.suggestItem}
-                  onPress={() => pickLoc(activeField === 'origin' ? setOrigin : setDest, item)}
-                >
-                  <Ionicons name="location-outline" size={16} color={tokens.textSecond} />
-                  <Text style={styles.suggestText} numberOfLines={1}>{item.label}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          )}
 
           {/* Hero ruta */}
           <View style={styles.routeHero}>
@@ -804,6 +787,21 @@ setSelectedRoute('main');
             </View>
           )}
         </ScrollView>
+
+        {activeSuggestions.length > 0 && (
+          <View style={styles.suggestList}>
+            {activeSuggestions.map((item, i) => (
+              <TouchableOpacity
+                key={String(i)}
+                style={styles.suggestItem}
+                onPress={() => pickLoc(activeField === 'origin' ? setOrigin : setDest, item)}
+              >
+                <Ionicons name="location-outline" size={16} color={tokens.textSecond} />
+                <Text style={styles.suggestText} numberOfLines={1}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </Animated.View>
 
 {/* Modal de reporte de incidente */}
@@ -1188,7 +1186,24 @@ function makeStyles(tokens: ThemeTokens) {
     alignItems: 'center', justifyContent: 'center',
   },
 
-  suggestList: { maxHeight: 220, marginTop: -8, marginBottom: tokens.spaceMd },
+  suggestList: {
+    position: 'absolute',
+    top: 153,
+    left: tokens.spaceXl,
+    right: tokens.spaceXl,
+    maxHeight: 220,
+    backgroundColor: tokens.surface,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.border,
+    zIndex: 100,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    overflow: 'hidden',
+  },
   suggestItem: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 10, paddingHorizontal: 4,
