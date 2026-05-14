@@ -14,6 +14,7 @@ import {
   removeToken,
   registerUnauthorizedHandler,
   fetchDrivers,
+  fetchTrucks,
 } from "@/services/api";
 import { fetchUserProfile } from "@/services/authApi";
 
@@ -23,6 +24,7 @@ interface AuthContextValue {
   authReady: boolean;
   drivers: Driver[];
   refreshDrivers: () => Promise<void>;
+  refreshTrucks: () => Promise<void>;
   login: (token: string, user: AuthUser) => void;
   logout: () => Promise<void>;
 }
@@ -45,20 +47,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshTrucks = useCallback(async () => {
+    try {
+      const list = await fetchTrucks();
+      setUser((u) => (u ? { ...u, trucks: list } : u));
+    } catch (err) {
+      console.error("Error al refrescar camiones:", err);
+    }
+  }, []);
+
   const ensureProfile = useCallback(async (accessToken: string) => {
     if (fetchingProfile.current) return;
     fetchingProfile.current = true;
     try {
       const res = await fetchUserProfile(accessToken, {});
-      // El backend todavía no devuelve drivers en /profile —
-      // los traemos aparte para que el contexto los exponga.
+      // El backend devuelve trucks en /profile sin el campo `driver` y no
+      // devuelve drivers — los traemos por separado vía /api/trucks y
+      // /api/drivers para que el contexto exponga la relación completa.
       let driversList: Driver[] = [];
       try {
         driversList = await fetchDrivers();
       } catch (err) {
         console.error("Error al obtener conductores:", err);
       }
-      setUser({ ...res.user, drivers: driversList });
+      let trucksList = res.user.trucks;
+      try {
+        trucksList = await fetchTrucks();
+      } catch (err) {
+        console.error("Error al obtener camiones:", err);
+      }
+      setUser({ ...res.user, trucks: trucksList, drivers: driversList });
       setDrivers(driversList);
     } catch (err) {
       console.error("Error al obtener el perfil:", err);
@@ -118,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, authReady, drivers, refreshDrivers, login, logout }}
+      value={{ user, token, authReady, drivers, refreshDrivers, refreshTrucks, login, logout }}
     >
       {children}
     </AuthContext.Provider>

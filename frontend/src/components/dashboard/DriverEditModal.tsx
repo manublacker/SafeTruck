@@ -1,11 +1,32 @@
 import { useState } from "react";
 import type { Driver } from "@/types/auth";
-import { createDriver, updateDriver } from "@/services/api";
+import { createDriver, updateDriver, deleteDriver } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Icons } from "./DashboardIcons";
 
 const DRIVER_ESTADOS = ["Activo", "De licencia", "Inactivo"] as const;
 type DriverEstado = (typeof DRIVER_ESTADOS)[number];
+
+const LICENCIA_CATEGORIAS = [
+  "B1", "B2",
+  "C1", "C2", "C3",
+  "D1", "D2", "D3",
+  "E1", "E2",
+  "G1", "G2", "G3",
+] as const;
+
+function sanitizeTelefono(raw: string): string {
+  const hasPlus = raw.trim().startsWith("+");
+  const digits = raw.replace(/\D/g, "").slice(0, 15);
+  return hasPlus ? `+${digits}` : digits;
+}
+
+function sanitizeLicencia(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, -3)}.${digits.slice(-3)}`;
+  return `${digits.slice(0, -6)}.${digits.slice(-6, -3)}.${digits.slice(-3)}`;
+}
 
 interface Props {
   driver: Driver | null;
@@ -72,14 +93,38 @@ export default function DriverEditModal({ driver, onSave, onClose }: Props) {
   );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isEdit = driver !== null;
   const title = isEdit ? "Editar conductor" : "Nuevo conductor";
+
+  async function handleDelete() {
+    if (!driver) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteDriver(driver.id);
+      await refreshDrivers();
+      onSave();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al eliminar el conductor.");
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   const update =
     (k: keyof DraftDriver) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setDraft((d) => ({ ...d, [k]: e.target.value }));
+
+  const updateMasked =
+    (k: keyof DraftDriver, mask: (s: string) => string) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setDraft((d) => ({ ...d, [k]: mask(e.target.value) }));
+
+  const today = new Date().toISOString().slice(0, 10);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -132,9 +177,12 @@ export default function DriverEditModal({ driver, onSave, onClose }: Props) {
             <Field label="Teléfono">
               <input
                 className="st-input"
+                type="tel"
+                inputMode="tel"
                 value={draft.telefono}
-                onChange={update("telefono")}
-                placeholder="+54 11 ..."
+                onChange={updateMasked("telefono", sanitizeTelefono)}
+                placeholder="+541112345678"
+                maxLength={16}
               />
             </Field>
             <Field label="Estado">
@@ -154,18 +202,24 @@ export default function DriverEditModal({ driver, onSave, onClose }: Props) {
             <Field label="Licencia">
               <input
                 className="st-input"
+                inputMode="numeric"
                 value={draft.licencia}
-                onChange={update("licencia")}
-                placeholder="B-1.234.567"
+                onChange={updateMasked("licencia", sanitizeLicencia)}
+                placeholder="1.234.567"
+                maxLength={10}
               />
             </Field>
             <Field label="Categoría licencia">
-              <input
-                className="st-input"
+              <select
+                className="st-select"
                 value={draft.categoria_licencia}
                 onChange={update("categoria_licencia")}
-                placeholder="E1"
-              />
+              >
+                <option value="">—</option>
+                {LICENCIA_CATEGORIAS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </Field>
           </div>
 
@@ -175,6 +229,7 @@ export default function DriverEditModal({ driver, onSave, onClose }: Props) {
               type="date"
               value={draft.vencimiento_licencia}
               onChange={update("vencimiento_licencia")}
+              min={today}
             />
           </Field>
         </div>
@@ -189,24 +244,91 @@ export default function DriverEditModal({ driver, onSave, onClose }: Props) {
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "flex-end",
+            justifyContent: isEdit ? "space-between" : "flex-end",
             gap: 12,
             marginTop: 22,
           }}
         >
-          <button type="button" className="st-btn-secondary" onClick={onClose} disabled={saving}>
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            className="st-btn-primary"
-            style={{ padding: "12px 20px" }}
-            disabled={saving}
-          >
-            {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear conductor"}
-          </button>
+          {isEdit && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              disabled={saving || deleting}
+              style={{
+                background: "transparent",
+                border: "1px solid #e53935",
+                color: "#e53935",
+                padding: "10px 16px",
+                borderRadius: 8,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Eliminar conductor
+            </button>
+          )}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button type="button" className="st-btn-secondary" onClick={onClose} disabled={saving || deleting}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="st-btn-primary"
+              style={{ padding: "12px 20px" }}
+              disabled={saving || deleting}
+            >
+              {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear conductor"}
+            </button>
+          </div>
         </div>
       </form>
+
+      {confirmDelete && driver && (
+        <div
+          className="st-modal-backdrop"
+          onClick={() => !deleting && setConfirmDelete(false)}
+          style={{ zIndex: 1000 }}
+        >
+          <div
+            className="st-modal"
+            style={{ maxWidth: 420 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: "1.05rem", fontWeight: 800, margin: "0 0 10px" }}>
+              ¿Eliminar este conductor?
+            </h3>
+            <p style={{ color: "#4b5563", fontSize: "0.9rem", margin: "0 0 18px" }}>
+              Estás por eliminar a <strong>{driver.nombre}</strong>. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                className="st-btn-secondary"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  background: "#e53935",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 18px",
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {deleting ? "Eliminando…" : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

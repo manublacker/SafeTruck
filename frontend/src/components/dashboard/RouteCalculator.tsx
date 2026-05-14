@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { calculateRoute } from "@/services/api";
 import {
   searchLocations,
@@ -8,12 +8,14 @@ import {
 import type { RouteResponse } from "@/types/route";
 import type { Truck } from "@/types/auth";
 
+export interface RouteCalculatorHandle {
+  calculate: () => Promise<RouteResponse | null>;
+}
+
 const MIN_QUERY_LENGTH = 3;
 const SEARCH_DEBOUNCE_MS = 350;
 const MAX_SUGGESTIONS = 6;
 const BLUR_CLOSE_DELAY_MS = 150;
-const PLACEHOLDER = "#9ca3af";
-
 const ROUTING_OPTIONS = {
   avoidTolls: true,
   preferHighways: true,
@@ -31,152 +33,90 @@ function emptyField(): Field {
 }
 
 interface Props {
-  availableTrucks: Truck[];
-  onRouteCalculated: (result: RouteResponse, truck: Truck) => void;
+  selectedTruck: Truck | null;
+  onRouteCalculated: (result: RouteResponse) => void;
 }
 
-export default function RouteCalculator({
-  availableTrucks,
-  onRouteCalculated,
-}: Props) {
+const RouteCalculator = forwardRef<RouteCalculatorHandle, Props>(function RouteCalculator(
+  { selectedTruck, onRouteCalculated },
+  ref,
+) {
   const [origin, setOrigin] = useState<Field>(emptyField());
   const [destination, setDestination] = useState<Field>(emptyField());
-  const [truckId, setTruckId] = useState<number | null>(
-    availableTrucks[0]?.id ?? null,
-  );
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const originTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const destTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Si la lista de camiones cambia (p.ej. uno se libera o se agrega),
-  // mantenemos seleccionado el actual o caemos al primero disponible.
-  useEffect(() => {
-    if (truckId && availableTrucks.some((t) => t.id === truckId)) return;
-    setTruckId(availableTrucks[0]?.id ?? null);
-  }, [availableTrucks, truckId]);
+  useImperativeHandle(ref, () => ({
+    async calculate() {
+      if (!selectedTruck) {
+        setError("Seleccioná un conductor con camión asignado.");
+        return null;
+      }
+      setError("");
+      try {
+        const [resolvedOrigin, resolvedDestination] = await Promise.all([
+          resolveField(origin, setOrigin),
+          resolveField(destination, setDestination),
+        ]);
 
-  const selectedTruck = availableTrucks.find((t) => t.id === truckId) ?? null;
+        const response = await calculateRoute({
+          originLabel: resolvedOrigin.label,
+          destinationLabel: resolvedDestination.label,
+          origin: { lat: resolvedOrigin.lat, lon: resolvedOrigin.lon },
+          destination: {
+            lat: resolvedDestination.lat,
+            lon: resolvedDestination.lon,
+          },
+          vehicle: {
+            maxWeightKg: selectedTruck.max_weight_kg,
+            maxHeightM: selectedTruck.max_height_m,
+            maxWidthM: selectedTruck.max_width_m,
+            maxLengthM: selectedTruck.max_length_m,
+          },
+          routingOptions: { ...ROUTING_OPTIONS },
+        });
 
-  if (availableTrucks.length === 0) {
-    return (
-      <Section title="Calcular ruta">
-        <p style={{ color: PLACEHOLDER, fontSize: "0.88rem", margin: 0 }}>
-          No hay camiones disponibles para calcular rutas.
-        </p>
-      </Section>
-    );
-  }
+        if (!response.found) {
+          setError(response.routeSummary || "No se encontró una ruta compatible.");
+          return null;
+        }
+        onRouteCalculated(response);
+        return response;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al calcular la ruta.");
+        return null;
+      }
+    },
+  }));
 
   return (
-    <Section title="Calcular ruta">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void handleSubmit();
-        }}
-        style={{ display: "flex", flexDirection: "column", gap: 14 }}
-      >
-        <AutocompleteField
-          label="Origen"
-          placeholder="Dirección de salida"
-          field={origin}
-          setField={setOrigin}
-          timerRef={originTimerRef}
-        />
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <AutocompleteField
+        label="Origen"
+        placeholder="Dirección de salida"
+        field={origin}
+        setField={setOrigin}
+        timerRef={originTimerRef}
+      />
 
-        <AutocompleteField
-          label="Destino"
-          placeholder="Dirección de llegada"
-          field={destination}
-          setField={setDestination}
-          timerRef={destTimerRef}
-        />
+      <AutocompleteField
+        label="Destino"
+        placeholder="Dirección de llegada"
+        field={destination}
+        setField={setDestination}
+        timerRef={destTimerRef}
+      />
 
-        <div>
-          <label className="st-label">Camión</label>
-          <select
-            className="st-select"
-            value={truckId ?? ""}
-            onChange={(e) => setTruckId(Number(e.target.value))}
-            required
-          >
-            {availableTrucks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {formatTruckOption(t)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {error && <ErrorMessage message={error} />}
-
-        <button
-          type="submit"
-          className="st-btn-primary"
-          style={{ width: "100%" }}
-          disabled={loading || !selectedTruck}
-        >
-          {loading ? "Calculando…" : "Calcular ruta"}
-        </button>
-      </form>
-    </Section>
+      {error && <ErrorMessage message={error} />}
+    </div>
   );
+});
 
-  async function handleSubmit() {
-    if (!selectedTruck) {
-      setError("Seleccioná un camión.");
-      return;
-    }
-
-    setError("");
-    setLoading(true);
-    try {
-      const [resolvedOrigin, resolvedDestination] = await Promise.all([
-        resolveField(origin, setOrigin),
-        resolveField(destination, setDestination),
-      ]);
-
-      const response = await calculateRoute({
-        originLabel: resolvedOrigin.label,
-        destinationLabel: resolvedDestination.label,
-        origin: { lat: resolvedOrigin.lat, lon: resolvedOrigin.lon },
-        destination: {
-          lat: resolvedDestination.lat,
-          lon: resolvedDestination.lon,
-        },
-        vehicle: {
-          maxWeightKg: selectedTruck.max_weight_kg,
-          maxHeightM: selectedTruck.max_height_m,
-          maxWidthM: selectedTruck.max_width_m,
-          maxLengthM: selectedTruck.max_length_m,
-        },
-        routingOptions: { ...ROUTING_OPTIONS },
-      });
-
-      if (!response.found) {
-        setError(response.routeSummary || "No se encontró una ruta compatible.");
-        return;
-      }
-
-      onRouteCalculated(response, selectedTruck);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al calcular la ruta.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-}
+export default RouteCalculator;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
-
-function formatTruckOption(t: Truck): string {
-  const tons = (t.max_weight_kg / 1000).toFixed(1).replace(/\.0$/, "");
-  return `${t.name} · ${tons} t · ${t.max_height_m} m alt`;
-}
 
 async function resolveField(
   field: Field,
@@ -283,30 +223,6 @@ function handleBlur(setter: React.Dispatch<React.SetStateAction<Field>>) {
   setTimeout(
     () => setter((f) => ({ ...f, open: false })),
     BLUR_CLOSE_DELAY_MS,
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <h2
-        style={{
-          fontSize: "0.95rem",
-          fontWeight: 800,
-          color: "#0d0d0d",
-          margin: "0 0 16px",
-        }}
-      >
-        {title}
-      </h2>
-      {children}
-    </div>
   );
 }
 

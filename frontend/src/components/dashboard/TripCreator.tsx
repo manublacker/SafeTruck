@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RouteResponse } from "@/types/route";
 import type { Truck, Driver } from "@/types/auth";
+import RouteCalculator, { type RouteCalculatorHandle } from "./RouteCalculator";
 
 const FLASH_DURATION_MS = 4000;
 const MUTED = "#6b7280";
@@ -9,95 +10,76 @@ const PLACEHOLDER = "#9ca3af";
 interface Props {
   routeResult: RouteResponse | null;
   availableDrivers: Driver[];
-  selectedTruck: Truck | null;
+  assignedTruck: Truck | null;
+  selectedDriverId: number | null;
+  onSelectDriver: (id: number | null) => void;
+  onRouteCalculated: (result: RouteResponse) => void;
 }
 
 interface DraftTrip {
-  driverId: number | null;
   date: string;
   time: string;
 }
 
-function emptyDraft(driverId: number | null): DraftTrip {
-  return { driverId, date: "", time: "" };
-}
+const EMPTY_DRAFT: DraftTrip = { date: "", time: "" };
 
 export default function TripCreator({
   routeResult,
   availableDrivers,
-  selectedTruck,
+  assignedTruck,
+  selectedDriverId,
+  onSelectDriver,
+  onRouteCalculated,
 }: Props) {
-  const [draft, setDraft] = useState<DraftTrip>(() =>
-    emptyDraft(availableDrivers[0]?.id ?? null),
-  );
+  const [draft, setDraft] = useState<DraftTrip>(EMPTY_DRAFT);
   const [flash, setFlash] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const routeRef = useRef<RouteCalculatorHandle>(null);
 
-  // Si los drivers cambian (otro se libera), aseguramos selección válida.
-  useEffect(() => {
-    if (
-      draft.driverId !== null &&
-      availableDrivers.some((d) => d.id === draft.driverId)
-    ) {
-      return;
-    }
-    setDraft((d) => ({ ...d, driverId: availableDrivers[0]?.id ?? null }));
-  }, [availableDrivers, draft.driverId]);
-
-  // Auto-clear del flash de éxito.
   useEffect(() => {
     if (!flash) return;
     const timer = window.setTimeout(() => setFlash(""), FLASH_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [flash]);
 
-  const hasRoute = Boolean(routeResult?.found);
   const hasDrivers = availableDrivers.length > 0;
-  const formDisabled = !hasRoute || !hasDrivers;
+  const hasTruck = Boolean(assignedTruck);
+  const formDisabled = !hasDrivers || !hasTruck || submitting;
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <Section title="Crear viaje">
-      {!hasRoute && <Hint>Calculá una ruta primero para asignar el viaje.</Hint>}
-
-      {hasRoute && !hasDrivers && (
+      {!hasDrivers && (
         <Hint tone="warning">
           Sin conductores disponibles. Activá uno para poder asignar el viaje.
         </Hint>
       )}
 
-      {hasRoute && selectedTruck && (
-        <RouteSummary route={routeResult!} truckName={selectedTruck.name} />
-      )}
-
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          handleSubmit();
+          void handleSubmit();
         }}
         style={{
           display: "flex",
           flexDirection: "column",
           gap: 14,
-          marginTop: 12,
-          opacity: formDisabled ? 0.55 : 1,
-          pointerEvents: formDisabled ? "none" : "auto",
         }}
-        aria-disabled={formDisabled}
       >
         <div>
           <label className="st-label">Conductor</label>
           <select
             className="st-select"
-            value={draft.driverId ?? ""}
+            value={selectedDriverId ?? ""}
             onChange={(e) =>
-              setDraft((d) => ({
-                ...d,
-                driverId: e.target.value === "" ? null : Number(e.target.value),
-              }))
+              onSelectDriver(
+                e.target.value === "" ? null : Number(e.target.value),
+              )
             }
-            disabled={formDisabled}
+            disabled={!hasDrivers}
             required
           >
-            {availableDrivers.length === 0 && (
+            {!hasDrivers && (
               <option value="">Sin conductores disponibles</option>
             )}
             {availableDrivers.map((d) => (
@@ -109,6 +91,8 @@ export default function TripCreator({
           </select>
         </div>
 
+        <AssignedTruckCard truck={assignedTruck} hasDrivers={hasDrivers} />
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div>
             <label className="st-label">Fecha</label>
@@ -119,7 +103,7 @@ export default function TripCreator({
               onChange={(e) =>
                 setDraft((d) => ({ ...d, date: e.target.value }))
               }
-              disabled={formDisabled}
+              min={today}
               required
             />
           </div>
@@ -132,11 +116,20 @@ export default function TripCreator({
               onChange={(e) =>
                 setDraft((d) => ({ ...d, time: e.target.value }))
               }
-              disabled={formDisabled}
               required
             />
           </div>
         </div>
+
+        <RouteCalculator
+          ref={routeRef}
+          selectedTruck={assignedTruck}
+          onRouteCalculated={onRouteCalculated}
+        />
+
+        {routeResult?.found && assignedTruck && (
+          <RouteSummary route={routeResult} truckName={assignedTruck.modelo ?? assignedTruck.name} />
+        )}
 
         <button
           type="submit"
@@ -144,7 +137,7 @@ export default function TripCreator({
           style={{ width: "100%" }}
           disabled={formDisabled}
         >
-          Crear viaje
+          {submitting ? "Creando viaje…" : "Crear viaje"}
         </button>
 
         {flash && <p className="st-flash-ok">{flash}</p>}
@@ -152,21 +145,74 @@ export default function TripCreator({
     </Section>
   );
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (formDisabled) return;
-    if (!routeResult || !selectedTruck) return;
-    if (draft.driverId === null) return;
+    if (!assignedTruck || selectedDriverId === null) return;
 
-    const driver = availableDrivers.find((d) => d.id === draft.driverId);
+    const driver = availableDrivers.find((d) => d.id === selectedDriverId);
     if (!driver) return;
 
-    // No hay endpoint de creación todavía: persistimos solo en estado local
-    // mediante el flash de feedback.
-    setFlash(
-      `Viaje creado para ${driver.nombre} · ${routeResult.originLabel} → ${routeResult.destinationLabel}`,
-    );
-    setDraft(emptyDraft(availableDrivers[0]?.id ?? null));
+    setSubmitting(true);
+    try {
+      const route = await routeRef.current?.calculate();
+      if (!route) return;
+      setFlash(
+        `Viaje creado para ${driver.nombre} · ${route.originLabel} → ${route.destinationLabel}`,
+      );
+      setDraft(EMPTY_DRAFT);
+    } finally {
+      setSubmitting(false);
+    }
   }
+}
+
+function AssignedTruckCard({
+  truck,
+  hasDrivers,
+}: {
+  truck: Truck | null;
+  hasDrivers: boolean;
+}) {
+  if (!hasDrivers) return null;
+  if (!truck) {
+    return (
+      <div
+        style={{
+          background: "rgba(229,57,53,0.04)",
+          border: "1px solid rgba(229,57,53,0.2)",
+          borderRadius: 10,
+          padding: "10px 12px",
+          fontSize: "0.85rem",
+          color: "#c62828",
+        }}
+      >
+        Este conductor no tiene un camión asignado.
+      </div>
+    );
+  }
+  const tons = (truck.max_weight_kg / 1000).toFixed(1).replace(/\.0$/, "");
+  return (
+    <div
+      style={{
+        background: "#fafafa",
+        border: "1px solid #f0f0f0",
+        borderRadius: 10,
+        padding: "10px 12px",
+        fontSize: "0.85rem",
+        color: MUTED,
+        lineHeight: 1.45,
+      }}
+    >
+      <div style={{ fontSize: "0.75rem", color: PLACEHOLDER, marginBottom: 2 }}>
+        Camión asignado
+      </div>
+      <div style={{ color: "#0d0d0d", fontWeight: 700 }}>
+        {truck.modelo ?? truck.name}
+        {truck.patente ? ` · ${truck.patente}` : ""}
+      </div>
+      <div>{tons} t · {truck.max_height_m} m alt</div>
+    </div>
+  );
 }
 
 // ── Subcomponentes ───────────────────────────────────────────────────────
@@ -182,10 +228,10 @@ function Section({
     <div>
       <h2
         style={{
-          fontSize: "0.95rem",
+          fontSize: "1.6rem",
           fontWeight: 800,
           color: "#0d0d0d",
-          margin: "0 0 16px",
+          margin: "0 0 20px",
         }}
       >
         {title}

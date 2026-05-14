@@ -18,7 +18,7 @@ type FleetTab = "trucks" | "drivers";
 
 export default function FleetView() {
   const { drivers, refreshDrivers } = useAuth();
-  const [tab, setTab] = useState<FleetTab>("trucks");
+  const [tab, setTab] = useState<FleetTab>("drivers");
 
   return (
     <div style={{ padding: 24, height: "100%", background: "#fff", overflowY: "auto" }}>
@@ -44,8 +44,8 @@ export default function FleetView() {
 
 function Tabs({ current, onChange }: { current: FleetTab; onChange: (t: FleetTab) => void }) {
   const items: { key: FleetTab; label: string }[] = [
-    { key: "trucks",  label: "Camiones" },
     { key: "drivers", label: "Conductores" },
+    { key: "trucks",  label: "Camiones" },
   ];
   return (
     <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #f0f0f0" }}>
@@ -79,7 +79,7 @@ function Tabs({ current, onChange }: { current: FleetTab; onChange: (t: FleetTab
 // ── Tab: Camiones ──────────────────────────────────────────────────────────
 
 function TrucksTab() {
-  const { drivers } = useAuth();
+  const { drivers, refreshTrucks } = useAuth();
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -109,11 +109,13 @@ function TrucksTab() {
     setEditing(null);
     setCreating(false);
     void loadTrucks();
+    void refreshTrucks();
   }
 
   function handleAssignDone() {
     setAssigning(null);
     void loadTrucks();
+    void refreshTrucks();
   }
 
   return (
